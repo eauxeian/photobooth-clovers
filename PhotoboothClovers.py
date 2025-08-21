@@ -43,7 +43,7 @@ sheet = client.open_by_key(SPREADSHEET_ID).sheet1
 # ---------------------------------------------------------
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("Photobooth Clovers.html")
 
 
 @app.route("/submit", methods=["POST"])
