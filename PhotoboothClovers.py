@@ -4,9 +4,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from flask_socketio import SocketIO
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from werkzeug.utils import secure_filename
 import json
-from io import StringIO
 
 # ---------------------------------------------------------
 # Flask + SocketIO Setup
@@ -43,7 +41,7 @@ sheet = client.open_by_key(SPREADSHEET_ID).sheet1
 # ---------------------------------------------------------
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", page="form")
 
 
 @app.route("/submit", methods=["POST"])
@@ -53,7 +51,7 @@ def submit():
     copies = request.form.get("copies", "0").strip()
     amount = request.form.get("amount", "0").strip()
 
-    # ✅ Sanitize name/email
+    # ✅ Sanitize
     name = re.sub(r"[^a-zA-Z0-9\s]", "", name)
     email = re.sub(r"[^a-zA-Z0-9@._-]", "", email)
 
@@ -71,8 +69,17 @@ def submit():
     sheet.append_row([name, email, copies, amount])
     socketio.emit("new_submission", {"name": name, "email": email, "copies": copies, "amount": amount})
 
-    flash("Submission successful!", "success")
-    return redirect(url_for("index"))
+    # queue position
+    records = sheet.get_all_records()
+    position = len(records)
+
+    return render_template("index.html", page="thanks", position=position)
+
+
+@app.route("/queue")
+def queue():
+    records = sheet.get_all_records()
+    return render_template("index.html", page="queue", orders=records)
 
 
 @app.route("/admin", methods=["GET", "POST"])
@@ -83,8 +90,8 @@ def admin():
             session["is_admin"] = True
             return redirect(url_for("dashboard"))
         else:
-            flash("Incorrect admin password.", "error")
-    return render_template("index.html")
+            return render_template("index.html", page="login", error="Incorrect admin password.")
+    return render_template("index.html", page="login")
 
 
 @app.route("/dashboard")
@@ -93,8 +100,13 @@ def dashboard():
         return redirect(url_for("admin"))
 
     records = sheet.get_all_records()
-    return render_template("index.html", records=records)
+    return render_template("index.html", page="admin", orders=records)
 
+
+@app.route("/logout")
+def logout():
+    session.pop("is_admin", None)
+    return redirect(url_for("index"))
 
 # ---------------------------------------------------------
 # Run App
