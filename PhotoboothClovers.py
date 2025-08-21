@@ -1,5 +1,6 @@
 import os
 import re
+from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_socketio import SocketIO
 import gspread
@@ -10,7 +11,7 @@ import json
 # Flask + SocketIO Setup
 # ---------------------------------------------------------
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev_secret")  # dev fallback
+app.secret_key = os.environ.get("SECRET_KEY", "dev_secret")
 socketio = SocketIO(app)
 
 # ---------------------------------------------------------
@@ -32,17 +33,16 @@ creds_dict = json.loads(GOOGLE_CREDS)
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 
-# ✅ Use Spreadsheet ID instead of name
 SPREADSHEET_ID = "19j-OddWhztjAPP3y3RobEeU4nM9ejJlFy2ZoHGKPShM"
 sheet = client.open_by_key(SPREADSHEET_ID).sheet1
 
 # ---------------------------------------------------------
 # Routes
 # ---------------------------------------------------------
-@app.route("/")
-def index():
-    return render_template("index.html", page="form")
 
+@app.route("/")
+def form():
+    return render_template("index.html", page="form")
 
 @app.route("/submit", methods=["POST"])
 def submit():
@@ -64,24 +64,29 @@ def submit():
                 raise ValueError
         except ValueError:
             flash("Invalid input: Copies must be ≥1 and Amount ≥0.", "error")
-            return redirect(url_for("index"))
+            return redirect(url_for("form"))
 
-        # ✅ Save to Google Sheet
-        try:
-            sheet.append_row([name, email, copies, amount])
-        except Exception as e:
-            app.logger.error(f"Google Sheets append_row failed: {e}")
-            return "Error writing to Google Sheets: " + str(e), 500
+        # ✅ Next ID
+        records = sheet.get_all_records()
+        next_id = len(records) + 1
 
-        # queue position
-        try:
-            records = sheet.get_all_records()
-            position = len(records)
-        except Exception as e:
-            app.logger.error(f"Google Sheets get_all_records failed: {e}")
-            return "Error reading Google Sheets: " + str(e), 500
+        # ✅ Build full row
+        new_row = [
+            next_id,
+            name,
+            email,
+            copies,
+            amount,
+            "Pending",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ]
 
-        return render_template("index.html", page="thanks", position=position)
+        sheet.append_row(new_row)
+
+        # Emit socket update
+        socketio.emit("orders_updated", {"id": next_id})
+
+        return render_template("index.html", page="thanks", position=next_id)
 
     except Exception as e:
         app.logger.error(f"Submit route failed: {e}", exc_info=True)
@@ -90,8 +95,8 @@ def submit():
 @app.route("/queue")
 def queue():
     records = sheet.get_all_records()
-    return render_template("index.html", page="queue", orders=records)
-
+    pending = [r for r in records if r["Status"] == "Pending"]
+    return render_template("index.html", page="queue", orders=pending)
 
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
@@ -101,23 +106,36 @@ def admin():
             session["is_admin"] = True
             return redirect(url_for("dashboard"))
         else:
-            return render_template("index.html", page="login", error="Incorrect admin password.")
+            return render_template("index.html", page="login", error="Incorrect password.")
     return render_template("index.html", page="login")
-
 
 @app.route("/dashboard")
 def dashboard():
     if not session.get("is_admin"):
         return redirect(url_for("admin"))
-
     records = sheet.get_all_records()
     return render_template("index.html", page="admin", orders=records)
 
-
 @app.route("/logout")
 def logout():
-    session.pop("is_admin", None)
-    return redirect(url_for("index"))
+    session.clear()
+    return redirect(url_for("form"))
+
+@app.route("/toggle/<int:order_id>", methods=["POST"])
+def toggle(order_id):
+    if not session.get("is_admin"):
+        return redirect(url_for("admin"))
+
+    records = sheet.get_all_records()
+    for i, r in enumerate(records, start=2):  # row 2 = first data row
+        if r["ID"] == order_id:
+            new_status = "Done" if r["Status"] == "Pending" else "Pending"
+            sheet.update_cell(i, 6, new_status)  # col 6 = Status
+            sheet.update_cell(i, 7, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            break
+
+    socketio.emit("orders_updated", {"id": order_id})
+    return redirect(url_for("dashboard"))
 
 # ---------------------------------------------------------
 # Run App

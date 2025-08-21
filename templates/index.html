@@ -4,9 +4,7 @@
   <meta charset="UTF-8" />
   <title>Photobooth Clovers</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Socket.IO -->
   <script src="https://cdn.socket.io/4.7.4/socket.io.min.js" crossorigin="anonymous"></script>
-
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -20,99 +18,21 @@
       --badge-done-bg: #4a7a44;
       --badge-done-text: #fff;
     }
-    * { box-sizing: border-box; }
-    body {
-      font-family: 'Inter', sans-serif;
-      background: var(--bg);
-      margin: 0;
-      padding: 2rem;
-      color: var(--text);
-    }
-    .container {
-      max-width: 1000px;
-      margin: auto;
-      background: #fff;
-      border-radius: 16px;
-      padding: 2rem;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.1);
-    }
-    h1 { margin: 0 0 1rem; text-align: center; }
-    h2 { margin: 0 0 1rem; }
-    .message { margin: 0.5rem 0 1rem; font-weight: 600; }
-
-    form { display: flex; flex-direction: column; gap: 0.75rem; }
-    input {
-      padding: 0.7rem 1rem;
-      border-radius: 12px;
-      border: 1px solid #d5dcd8;
-      font-size: 1rem;
-    }
-    .btn {
-      border: none;
-      border-radius: 12px;
-      padding: 0.7rem 1.2rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: 0.2s;
-      background: var(--green);
-      color: #fff;
-      display: inline-block;
-      text-decoration: none;
-    }
-    .btn:hover { background: var(--green-dark); }
-    .btn-secondary {
-      background: #f0f3f1;
-      color: var(--text);
-    }
-    .btn-secondary:hover {
-      background: #e8eeea;
-    }
-
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-    th, td { text-align: left; padding: 0.75rem; }
-    th { background: #e6f5ec; color: var(--text); font-weight: 600; }
-    tr:nth-child(even) { background: #f9f9f9; }
-    .badge {
-      padding: 0.25rem 0.6rem;
-      border-radius: 12px;
-      font-weight: 600;
-      font-size: 0.85rem;
-      display: inline-block;
-      white-space: nowrap;
-    }
-    .badge.pending {
-      background: var(--badge-pending-bg);
-      color: var(--badge-pending-text);
-    }
-    .badge.done {
-      background: var(--badge-done-bg);
-      color: var(--badge-done-text);
-    }
-    .thank {
-      text-align: center;
-      margin: 2rem 0 0.5rem;
-    }
-    .queue-number {
-      display: inline-block;
-      padding: 0.4rem 0.9rem;
-      border-radius: 12px;
-      background: #eaf7ec;
-      border: 1px solid #cfe6d2;
-      font-size: 1.15rem;
-      margin-left: 0.3rem;
-    }
-    .top-actions {
-      display: flex;
-      gap: 0.5rem;
-      justify-content: center;
-      margin: 0.75rem 0 0;
-      flex-wrap: wrap;
-    }
-
-    @media (max-width: 600px) {
-      th, td, input, button { font-size: 0.95rem; }
-      .container { padding: 1rem; }
-    }
+    body { font-family:'Inter',sans-serif; background:var(--bg); margin:0; padding:2rem; color:var(--text);}
+    .container { max-width:1000px; margin:auto; background:#fff; border-radius:16px; padding:2rem; box-shadow:0 6px 20px rgba(0,0,0,0.1);}
+    h1 { margin-bottom:1rem; text-align:center;}
+    .btn {border:none; border-radius:12px; padding:0.7rem 1.2rem; font-weight:600; cursor:pointer; transition:0.2s; background:var(--green); color:#fff; text-decoration:none;}
+    .btn:hover { background:var(--green-dark);}
+    .btn-secondary { background:#f0f3f1; color:var(--text);}
+    .btn-secondary:hover { background:#e8eeea;}
+    table { width:100%; border-collapse:collapse; margin-top:1rem;}
+    th,td { text-align:left; padding:0.75rem;}
+    th { background:#e6f5ec;}
+    tr:nth-child(even) { background:#f9f9f9;}
+    .badge { padding:0.25rem 0.6rem; border-radius:12px; font-weight:600; font-size:0.85rem;}
+    .badge.pending { background:var(--badge-pending-bg); color:var(--badge-pending-text);}
+    .badge.done { background:var(--badge-done-bg); color:var(--badge-done-text);}
+    .top-actions { display:flex; gap:0.5rem; justify-content:center; margin-top:1rem; flex-wrap:wrap;}
   </style>
 </head>
 <body>
@@ -120,15 +40,13 @@
 
   {% if page == 'form' %}
     <h1>📸 Photobooth Clovers — Order Form</h1>
-    {% if message %}<div class="message">{{ message }}</div>{% endif %}
     <form action="{{ url_for('submit') }}" method="POST" autocomplete="off">
-      <input type="text"   name="name"   placeholder="Name" required>
-      <input type="email"  name="email"  placeholder="Email (optional)">
+      <input type="text" name="name" placeholder="Name" required>
+      <input type="email" name="email" placeholder="Email (optional)">
       <input type="number" name="copies" placeholder="Number of Copies" required min="1">
       <input type="number" name="amount" placeholder="Amount Paid" required min="0">
       <button type="submit" class="btn">Submit</button>
     </form>
-
     <div class="top-actions">
       <a href="{{ url_for('queue') }}" class="btn btn-secondary">🔎 View Live Queue</a>
       <a href="{{ url_for('admin') }}" class="btn btn-secondary">🛠 Admin</a>
@@ -136,50 +54,33 @@
 
   {% elif page == 'thanks' %}
     <h1>✅ Order Submitted!</h1>
-    <p class="thank">Your order was received.</p>
-    {% if position %}
-      <p class="thank">🎟️ Your current queue number is
-        <span class="queue-number">#{{ position }}</span>
-      </p>
-    {% else %}
-      <p class="thank">If your order is already marked done, it may no longer appear in the queue.</p>
-    {% endif %}
+    <p style="text-align:center;">🎟️ Your queue number: <b>#{{ position }}</b></p>
     <div class="top-actions">
-      <a class="btn" href="{{ url_for('queue') }}">Go to Live Queue</a>
-      <a class="btn btn-secondary" href="{{ url_for('form') }}">Submit Another Order</a>
+      <a href="{{ url_for('queue') }}" class="btn">Go to Live Queue</a>
+      <a href="{{ url_for('form') }}" class="btn btn-secondary">Submit Another</a>
     </div>
 
   {% elif page == 'queue' %}
     <h1>📋 Live Queue</h1>
-    <p class="message">This list updates automatically when orders are processed.</p>
     <table>
-      <thead>
-        <tr>
-          <th># (live)</th>
-          <th>Name</th>
-          <th>Copies</th>
-          <th>Amount</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody id="queue-body">
+      <thead><tr><th>#</th><th>Name</th><th>Copies</th><th>Amount</th><th>Status</th></tr></thead>
+      <tbody>
         {% for r in orders %}
-        <tr>
-          <td>{{ loop.index }}</td>
-          <td>{{ r["Name"] }}</td>
-          <td>{{ r["Copies"] }}</td>
-          <td>{{ r["Amount Paid"] }}</td>
-          <td><span class="badge pending">Pending</span></td>
-        </tr>
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ r["Name"] }}</td>
+            <td>{{ r["Copies"] }}</td>
+            <td>{{ r["Amount Paid"] }}</td>
+            <td><span class="badge pending">Pending</span></td>
+          </tr>
         {% endfor %}
         {% if orders|length == 0 %}
-        <tr><td colspan="5" style="color:var(--muted);">No pending orders right now.</td></tr>
+          <tr><td colspan="5" style="color:var(--muted);">No pending orders right now.</td></tr>
         {% endif %}
       </tbody>
     </table>
-
     <div class="top-actions">
-      <a href="{{ url_for('form') }}" class="btn btn-secondary">⬅ Back to Order Form</a>
+      <a href="{{ url_for('form') }}" class="btn btn-secondary">⬅ Back to Form</a>
     </div>
 
   {% elif page == 'login' %}
@@ -188,10 +89,7 @@
       <input type="password" name="password" placeholder="Admin Password" required>
       <button type="submit" class="btn">Login</button>
     </form>
-    {% if error %}<div class="message" style="color:#b00020">{{ error }}</div>{% endif %}
-    <div class="top-actions">
-      <a href="{{ url_for('queue') }}" class="btn btn-secondary">View Queue</a>
-    </div>
+    {% if error %}<p style="color:#b00020">{{ error }}</p>{% endif %}
 
   {% elif page == 'admin' %}
     <h1>🛠 Admin Dashboard</h1>
@@ -201,58 +99,37 @@
     </div>
     <table>
       <thead>
-        <tr>
-          <th>#</th>
-          <th>Name</th>
-          <th>Email</th>
-          <th>Copies</th>
-          <th>Amount</th>
-          <th>Status</th>
-          <th>Updated</th>
-          <th>Action</th>
-        </tr>
+        <tr><th>#</th><th>Name</th><th>Email</th><th>Copies</th><th>Amount</th><th>Status</th><th>Updated</th><th>Action</th></tr>
       </thead>
-      <tbody id="admin-body">
+      <tbody>
         {% for r in orders %}
-        <tr>
-          <td>{{ loop.index }}</td>
-          <td>{{ r["Name"] }}</td>
-          <td>{{ r["Email"] }}</td>
-          <td>{{ r["Copies"] }}</td>
-          <td>{{ r["Amount Paid"] }}</td>
-          <td>
-            <span class="badge {{ 'pending' if r['Status']=='Pending' else 'done' }}">
-              {{ r["Status"] }}
-            </span>
-          </td>
-          <td>{{ r["Timestamp"] }}</td>
-          <td>
-            <form method="POST" action="{{ url_for('toggle', order_id=r['ID']) }}" style="display:inline;">
-              <button class="btn" type="submit">
-                {% if r["Status"] == "Pending" %}Mark Done{% else %}Undo{% endif %}
-              </button>
-            </form>
-          </td>
-        </tr>
+          <tr>
+            <td>{{ r["ID"] }}</td>
+            <td>{{ r["Name"] }}</td>
+            <td>{{ r["Email"] }}</td>
+            <td>{{ r["Copies"] }}</td>
+            <td>{{ r["Amount Paid"] }}</td>
+            <td><span class="badge {{ 'pending' if r['Status']=='Pending' else 'done' }}">{{ r["Status"] }}</span></td>
+            <td>{{ r["Timestamp"] }}</td>
+            <td>
+              <form method="POST" action="{{ url_for('toggle', order_id=r['ID']) }}">
+                <button class="btn" type="submit">
+                  {% if r["Status"] == "Pending" %}Mark Done{% else %}Undo{% endif %}
+                </button>
+              </form>
+            </td>
+          </tr>
         {% endfor %}
-        {% if orders|length == 0 %}
-        <tr><td colspan="8" style="color:var(--muted);">No orders yet.</td></tr>
-        {% endif %}
       </tbody>
     </table>
-
   {% endif %}
-
 </div>
 
 <script>
-  // Live updates only when something actually changes
   const socket = io();
-
-  socket.on("orders_updated", (payload) => {
-    // Simple approach: reload the page if we're on queue/admin/thanks
+  socket.on("orders_updated", () => {
     const path = window.location.pathname;
-    if (path === "/queue" || path === "/admin" || path.startsWith("/thanks")) {
+    if (path === "/queue" || path === "/admin") {
       window.location.reload();
     }
   });
