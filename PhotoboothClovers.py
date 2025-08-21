@@ -1,4 +1,6 @@
 import os
+import eventlet
+print("Eventlet version:", eventlet.__version__)
 import re
 import json
 import eventlet
