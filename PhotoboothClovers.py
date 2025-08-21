@@ -46,35 +46,46 @@ def index():
 
 @app.route("/submit", methods=["POST"])
 def submit():
-    name = request.form.get("name", "").strip()
-    email = request.form.get("email", "").strip()
-    copies = request.form.get("copies", "0").strip()
-    amount = request.form.get("amount", "0").strip()
-
-    # ✅ Sanitize
-    name = re.sub(r"[^a-zA-Z0-9\s]", "", name)
-    email = re.sub(r"[^a-zA-Z0-9@._-]", "", email)
-
-    # ✅ Validate numbers
     try:
-        copies = int(copies)
-        amount = float(amount)
-        if copies < 1 or amount < 0:
-            raise ValueError
-    except ValueError:
-        flash("Invalid input: Copies must be ≥1 and Amount ≥0.", "error")
-        return redirect(url_for("index"))
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip()
+        copies = request.form.get("copies", "0").strip()
+        amount = request.form.get("amount", "0").strip()
 
-    # ✅ Save to Google Sheet
-    sheet.append_row([name, email, copies, amount])
-    socketio.emit("new_submission", {"name": name, "email": email, "copies": copies, "amount": amount})
+        # ✅ Sanitize
+        name = re.sub(r"[^a-zA-Z0-9\s]", "", name)
+        email = re.sub(r"[^a-zA-Z0-9@._-]", "", email)
 
-    # queue position
-    records = sheet.get_all_records()
-    position = len(records)
+        # ✅ Validate numbers
+        try:
+            copies = int(copies)
+            amount = float(amount)
+            if copies < 1 or amount < 0:
+                raise ValueError
+        except ValueError:
+            flash("Invalid input: Copies must be ≥1 and Amount ≥0.", "error")
+            return redirect(url_for("index"))
 
-    return render_template("index.html", page="thanks", position=position)
+        # ✅ Save to Google Sheet
+        try:
+            sheet.append_row([name, email, copies, amount])
+        except Exception as e:
+            app.logger.error(f"Google Sheets append_row failed: {e}")
+            return "Error writing to Google Sheets: " + str(e), 500
 
+        # queue position
+        try:
+            records = sheet.get_all_records()
+            position = len(records)
+        except Exception as e:
+            app.logger.error(f"Google Sheets get_all_records failed: {e}")
+            return "Error reading Google Sheets: " + str(e), 500
+
+        return render_template("index.html", page="thanks", position=position)
+
+    except Exception as e:
+        app.logger.error(f"Submit route failed: {e}", exc_info=True)
+        return "Internal Server Error: " + str(e), 500
 
 @app.route("/queue")
 def queue():
