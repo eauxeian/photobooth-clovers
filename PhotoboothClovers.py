@@ -5,6 +5,8 @@ from flask_socketio import SocketIO
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from werkzeug.utils import secure_filename
+import json
+from io import StringIO
 
 # ---------------------------------------------------------
 # Flask + SocketIO Setup
@@ -27,16 +29,14 @@ if not GOOGLE_CREDS:
 # ---------------------------------------------------------
 # Google Sheets Setup
 # ---------------------------------------------------------
-import json
-from io import StringIO
-
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds_dict = json.loads(GOOGLE_CREDS)
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 
-# Replace with your Google Sheet name
-sheet = client.open("CLOVERS PHOTOBOOTH").sheet1
+# ✅ Use Spreadsheet ID instead of name
+SPREADSHEET_ID = "19j-OddWhztjAPP3y3RobEeU4nM9ejJlFy2ZoHGKPShM"
+sheet = client.open_by_key(SPREADSHEET_ID).sheet1
 
 # ---------------------------------------------------------
 # Routes
