@@ -84,7 +84,7 @@ def admin():
             return redirect(url_for("dashboard"))
         else:
             flash("Incorrect admin password.", "error")
-    return render_template("admin.html")
+    return render_template("Photobooth Clovers HTML.html")
 
 
 @app.route("/dashboard")
@@ -93,7 +93,7 @@ def dashboard():
         return redirect(url_for("admin"))
 
     records = sheet.get_all_records()
-    return render_template("dashboard.html", records=records)
+    return render_template("Photobooth Clovers HTML.html", records=records)
 
 
 # ---------------------------------------------------------
