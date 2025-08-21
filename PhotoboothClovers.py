@@ -1,11 +1,10 @@
 import os
 import json
 import re
-from datetime import datetime
 
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_socketio import SocketIO
 
 # ---------------------------------------------------------
@@ -71,6 +70,7 @@ def submit():
     email = request.form.get("email", "").strip()
     copies = request.form.get("copies", "0").strip()
     amount = request.form.get("amount", "0").strip()
+    timestamp = request.form.get("timestamp", "").strip()  # client device time
 
     # sanitize inputs
     name = re.sub(r"[^a-zA-Z0-9\s]", "", name)
@@ -85,10 +85,13 @@ def submit():
         flash("Invalid input: Copies must be ≥1 and Amount ≥0.", "error")
         return redirect(url_for("form"))
 
-    # Generate ID + timestamp
+    # Generate ID
     records = sheet.get_all_records()
     new_id = len(records) + 1
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    if not timestamp:  # fallback server time if missing
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # Save to Google Sheets
     sheet.append_row([new_id, name, email, copies, amount, "Pending", timestamp])

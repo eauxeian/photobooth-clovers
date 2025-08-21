@@ -144,5 +144,49 @@
     }
   });
 </script>
+
+<script>
+  // Attach device time before submitting
+  function addTimestamp(form) {
+    const now = new Date();
+    const ts = now.getFullYear() + "-" +
+               String(now.getMonth()+1).padStart(2,"0") + "-" +
+               String(now.getDate()).padStart(2,"0") + " " +
+               String(now.getHours()).padStart(2,"0") + ":" +
+               String(now.getMinutes()).padStart(2,"0") + ":" +
+               String(now.getSeconds()).padStart(2,"0");
+    document.getElementById("timestamp").value = ts;
+    return true;
+  }
+
+  const socket = io();
+
+  // Handle live queue updates
+  socket.on("queue_update", (queue) => {
+    if (window.location.pathname === "/queue") {
+      const tbody = document.getElementById("queue-body");
+      tbody.innerHTML = "";
+      const pending = queue.filter(o => o.Status === "Pending");
+      if (pending.length === 0) {
+        tbody.innerHTML = "<tr><td colspan='4'>No pending orders 🎉</td></tr>";
+      } else {
+        pending.forEach((order, idx) => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${idx + 1}</td>
+            <td>${order.Name}</td>
+            <td>${order.Copies}</td>
+            <td>${order["Amount Paid"]}</td>
+          `;
+          tbody.appendChild(row);
+        });
+      }
+    }
+    if (window.location.pathname === "/admin") {
+      window.location.reload(); // update admin instantly
+    }
+  });
+</script>
+
 </body>
 </html>
