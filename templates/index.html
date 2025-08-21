@@ -29,24 +29,25 @@
 
   {% if page == 'form' %}
     <h1>🍀 Clovers Photobooth — Order Form</h1>
-    <form action="{{ url_for('submit') }}" method="POST">
+    <form action="{{ url_for('submit') }}" method="POST" onsubmit="return addTimestamp(this)">
       <input type="text" name="name" placeholder="Full Name" required>
       <input type="email" name="email" placeholder="Email (optional)">
       <input type="number" name="copies" placeholder="Number of Copies" min="1" required>
       <input type="number" name="amount" placeholder="Amount Paid" min="0" required>
+      <input type="hidden" name="timestamp" id="timestamp">
       <button type="submit">Submit Order</button>
     </form>
     <div class="top-actions">
-      <a href="{{ url_for('queue') }}"><button class="btn-secondary">View Queue</button></a>
-      <a href="{{ url_for('admin') }}"><button class="btn-secondary">Admin</button></a>
+      <a href="{{ url_for('queue') }}"><button class="btn-secondary" type="button">View Queue</button></a>
+      <a href="{{ url_for('admin') }}"><button class="btn-secondary" type="button">Admin</button></a>
     </div>
 
   {% elif page == 'thanks' %}
     <h1>✅ Order Submitted!</h1>
     <p style="text-align:center;">Your queue number: <b>#{{ position }}</b></p>
     <div class="top-actions">
-      <a href="{{ url_for('queue') }}"><button>Go to Queue</button></a>
-      <a href="{{ url_for('form') }}"><button class="btn-secondary">Submit Another</button></a>
+      <a href="{{ url_for('queue') }}"><button type="button">Go to Queue</button></a>
+      <a href="{{ url_for('form') }}"><button class="btn-secondary" type="button">Submit Another</button></a>
     </div>
 
   {% elif page == 'queue' %}
@@ -69,7 +70,7 @@
       </tbody>
     </table>
     <div class="top-actions">
-      <a href="{{ url_for('form') }}"><button class="btn-secondary">Back to Form</button></a>
+      <a href="{{ url_for('form') }}"><button class="btn-secondary" type="button">Back to Form</button></a>
     </div>
 
   {% elif page == 'login' %}
@@ -83,8 +84,8 @@
   {% elif page == 'admin' %}
     <h1>🛠 Admin Dashboard</h1>
     <div class="top-actions">
-      <a href="{{ url_for('logout') }}"><button class="btn-secondary">Logout</button></a>
-      <a href="{{ url_for('queue') }}"><button class="btn-secondary">View Queue</button></a>
+      <a href="{{ url_for('logout') }}"><button class="btn-secondary" type="button">Logout</button></a>
+      <a href="{{ url_for('queue') }}"><button class="btn-secondary" type="button">View Queue</button></a>
     </div>
     <table>
       <thead>
@@ -117,35 +118,6 @@
 <script>
   const socket = io();
 
-  // Handle live queue updates
-  socket.on("queue_update", (queue) => {
-    if (window.location.pathname === "/queue") {
-      const tbody = document.getElementById("queue-body");
-      tbody.innerHTML = "";
-      const pending = queue.filter(o => o.Status === "Pending");
-      if (pending.length === 0) {
-        tbody.innerHTML = "<tr><td colspan='4'>No pending orders 🎉</td></tr>";
-      } else {
-        pending.forEach((order, idx) => {
-          const row = document.createElement("tr");
-          row.innerHTML = `
-            <td>${idx + 1}</td>
-            <td>${order.Name}</td>
-            <td>${order.Copies}</td>
-            <td>${order["Amount Paid"]}</td>
-          `;
-          tbody.appendChild(row);
-        });
-      }
-    }
-    if (window.location.pathname === "/admin") {
-      // For admin, safest fallback = reload
-      window.location.reload();
-    }
-  });
-</script>
-
-<script>
   // Attach device time before submitting
   function addTimestamp(form) {
     const now = new Date();
@@ -158,8 +130,6 @@
     document.getElementById("timestamp").value = ts;
     return true;
   }
-
-  const socket = io();
 
   // Handle live queue updates
   socket.on("queue_update", (queue) => {
