@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Confirmation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f5f9f6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 400px;
+        }
+        h1 {
+            color: #1a4d2e;
+            margin-bottom: 1rem;
+        }
+        .queue {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #2e7d32;
+            margin: 1rem 0;
+        }
+        a {
+            display: inline-block;
+            margin-top: 1rem;
+            text-decoration: none;
+            background: #2e7d32;
+            color: white;
+            padding: 0.6rem 1.2rem;
+            border-radius: 12px;
+            transition: 0.2s;
+        }
+        a:hover {
+            background: #256428;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>✅ Order Submitted!</h1>
+        <p>Your queue number is:</p>
+        <div class="queue">#{{ queue_number }}</div>
+        <a href="/">⬅ Back to Order Form</a>
+    </div>
+</body>
+</html>
