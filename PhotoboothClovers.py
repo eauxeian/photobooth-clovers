@@ -36,7 +36,7 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 
 # Replace with your Google Sheet name
-sheet = client.open("Photobooth Clovers").sheet1
+sheet = client.open("CLOVERS PHOTOBOOTH").sheet1
 
 # ---------------------------------------------------------
 # Routes
