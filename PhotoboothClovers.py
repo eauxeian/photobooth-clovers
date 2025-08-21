@@ -5,7 +5,7 @@ from datetime import datetime
 
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_socketio import SocketIO
 
 # ---------------------------------------------------------
@@ -38,6 +38,24 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 
 sheet = client.open_by_key(SPREADSHEET_ID).sheet1
+
+# ---------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------
+def broadcast_queue():
+    """Recalculate queue positions and broadcast live to all clients."""
+    records = sheet.get_all_records()
+
+    # Only active (Pending) orders
+    active_orders = [o for o in records if o.get("Status", "").lower() != "done"]
+
+    # Assign queue numbers dynamically
+    for idx, order in enumerate(active_orders, start=1):
+        order["QueueNumber"] = idx
+
+    # Push update to all clients
+    socketio.emit("queue_update", active_orders, broadcast=True)
+    return active_orders
 
 # ---------------------------------------------------------
 # Routes
@@ -74,7 +92,9 @@ def submit():
 
     # Save to Google Sheets
     sheet.append_row([new_id, name, email, copies, amount, "Pending", timestamp])
-    socketio.emit("orders_updated", {})
+
+    # Broadcast live queue
+    broadcast_queue()
 
     return render_template("index.html", page="thanks", position=new_id)
 
@@ -117,7 +137,8 @@ def toggle(order_id):
         if row["ID"] == order_id:
             new_status = "Done" if row["Status"] == "Pending" else "Pending"
             sheet.update_cell(idx, 6, new_status)  # Status column is 6th
-            socketio.emit("orders_updated", {})
+            # Broadcast queue update
+            broadcast_queue()
             break
 
     return redirect(url_for("dashboard"))

@@ -52,11 +52,11 @@
   {% elif page == 'queue' %}
     <h1>📋 Live Queue</h1>
     <table>
-      <thead><tr><th>ID</th><th>Name</th><th>Copies</th><th>Amount</th><th>Status</th></tr></thead>
-      <tbody>
+      <thead><tr><th>#</th><th>Name</th><th>Copies</th><th>Amount</th><th>Status</th></tr></thead>
+      <tbody id="queue-body">
         {% for r in orders %}
           <tr>
-            <td>{{ r["ID"] }}</td>
+            <td>{{ loop.index }}</td>
             <td>{{ r["Name"] }}</td>
             <td>{{ r["Copies"] }}</td>
             <td>{{ r["Amount Paid"] }}</td>
@@ -90,7 +90,7 @@
       <thead>
         <tr><th>ID</th><th>Name</th><th>Email</th><th>Copies</th><th>Amount</th><th>Status</th><th>Timestamp</th><th>Action</th></tr>
       </thead>
-      <tbody>
+      <tbody id="admin-body">
         {% for r in orders %}
           <tr>
             <td>{{ r["ID"] }}</td>
@@ -116,8 +116,30 @@
 
 <script>
   const socket = io();
-  socket.on("orders_updated", () => {
-    if (window.location.pathname === "/queue" || window.location.pathname === "/admin") {
+
+  // Handle live queue updates
+  socket.on("queue_update", (queue) => {
+    if (window.location.pathname === "/queue") {
+      const tbody = document.getElementById("queue-body");
+      tbody.innerHTML = "";
+      if (queue.length === 0) {
+        tbody.innerHTML = "<tr><td colspan='5'>No orders yet.</td></tr>";
+      } else {
+        queue.forEach((order, idx) => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${idx + 1}</td>
+            <td>${order.Name}</td>
+            <td>${order.Copies}</td>
+            <td>${order["Amount Paid"]}</td>
+            <td><span class="badge ${order.Status === "Pending" ? "pending" : "done"}">${order.Status}</span></td>
+          `;
+          tbody.appendChild(row);
+        });
+      }
+    }
+    if (window.location.pathname === "/admin") {
+      // For admin, safest fallback = reload
       window.location.reload();
     }
   });
