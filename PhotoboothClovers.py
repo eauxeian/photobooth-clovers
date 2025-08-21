@@ -1,17 +1,17 @@
 import os
 import re
-from datetime import datetime
+import json
+import gspread
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_socketio import SocketIO
-import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import json
+from datetime import datetime
 
 # ---------------------------------------------------------
 # Flask + SocketIO Setup
 # ---------------------------------------------------------
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev_secret")
+app.secret_key = os.environ.get("SECRET_KEY", "dev_secret")  # dev fallback
 socketio = SocketIO(app)
 
 # ---------------------------------------------------------
@@ -36,67 +36,53 @@ client = gspread.authorize(creds)
 SPREADSHEET_ID = "19j-OddWhztjAPP3y3RobEeU4nM9ejJlFy2ZoHGKPShM"
 sheet = client.open_by_key(SPREADSHEET_ID).sheet1
 
+
 # ---------------------------------------------------------
 # Routes
 # ---------------------------------------------------------
-
 @app.route("/")
 def form():
     return render_template("index.html", page="form")
 
+
 @app.route("/submit", methods=["POST"])
 def submit():
+    name = request.form.get("name", "").strip()
+    email = request.form.get("email", "").strip()
+    copies = request.form.get("copies", "0").strip()
+    amount = request.form.get("amount", "0").strip()
+
+    # ✅ Sanitize
+    name = re.sub(r"[^a-zA-Z0-9\s]", "", name)
+    email = re.sub(r"[^a-zA-Z0-9@._-]", "", email)
+
     try:
-        name = request.form.get("name", "").strip()
-        email = request.form.get("email", "").strip()
-        copies = request.form.get("copies", "0").strip()
-        amount = request.form.get("amount", "0").strip()
+        copies = int(copies)
+        amount = float(amount)
+        if copies < 1 or amount < 0:
+            raise ValueError
+    except ValueError:
+        flash("Invalid input: Copies must be ≥1 and Amount ≥0.", "error")
+        return redirect(url_for("form"))
 
-        # ✅ Sanitize
-        name = re.sub(r"[^a-zA-Z0-9\s]", "", name)
-        email = re.sub(r"[^a-zA-Z0-9@._-]", "", email)
+    # Generate ID and timestamp
+    records = sheet.get_all_records()
+    new_id = len(records) + 1
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # ✅ Validate numbers
-        try:
-            copies = int(copies)
-            amount = float(amount)
-            if copies < 1 or amount < 0:
-                raise ValueError
-        except ValueError:
-            flash("Invalid input: Copies must be ≥1 and Amount ≥0.", "error")
-            return redirect(url_for("form"))
+    # Append new row
+    sheet.append_row([new_id, name, email, copies, amount, "Pending", timestamp])
+    socketio.emit("orders_updated", {})
 
-        # ✅ Next ID
-        records = sheet.get_all_records()
-        next_id = len(records) + 1
+    # Redirect to thanks page
+    return render_template("index.html", page="thanks", position=new_id)
 
-        # ✅ Build full row
-        new_row = [
-            next_id,
-            name,
-            email,
-            copies,
-            amount,
-            "Pending",
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        ]
-
-        sheet.append_row(new_row)
-
-        # Emit socket update
-        socketio.emit("orders_updated", {"id": next_id})
-
-        return render_template("index.html", page="thanks", position=next_id)
-
-    except Exception as e:
-        app.logger.error(f"Submit route failed: {e}", exc_info=True)
-        return "Internal Server Error: " + str(e), 500
 
 @app.route("/queue")
 def queue():
-    records = sheet.get_all_records()
-    pending = [r for r in records if r["Status"] == "Pending"]
-    return render_template("index.html", page="queue", orders=pending)
+    orders = sheet.get_all_records()
+    return render_template("index.html", page="queue", orders=orders)
+
 
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
@@ -107,35 +93,40 @@ def admin():
             return redirect(url_for("dashboard"))
         else:
             return render_template("index.html", page="login", error="Incorrect password.")
+
     return render_template("index.html", page="login")
+
 
 @app.route("/dashboard")
 def dashboard():
     if not session.get("is_admin"):
         return redirect(url_for("admin"))
-    records = sheet.get_all_records()
-    return render_template("index.html", page="admin", orders=records)
 
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("form"))
+    orders = sheet.get_all_records()
+    return render_template("index.html", page="admin", orders=orders)
+
 
 @app.route("/toggle/<int:order_id>", methods=["POST"])
 def toggle(order_id):
     if not session.get("is_admin"):
         return redirect(url_for("admin"))
 
-    records = sheet.get_all_records()
-    for i, r in enumerate(records, start=2):  # row 2 = first data row
-        if r["ID"] == order_id:
-            new_status = "Done" if r["Status"] == "Pending" else "Pending"
-            sheet.update_cell(i, 6, new_status)  # col 6 = Status
-            sheet.update_cell(i, 7, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    data = sheet.get_all_records()
+    for idx, row in enumerate(data, start=2):  # start=2 because of headers
+        if row["ID"] == order_id:
+            new_status = "Done" if row["Status"] == "Pending" else "Pending"
+            sheet.update_cell(idx, 6, new_status)  # Status column is 6th
+            socketio.emit("orders_updated", {})
             break
 
-    socketio.emit("orders_updated", {"id": order_id})
     return redirect(url_for("dashboard"))
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("admin"))
+
 
 # ---------------------------------------------------------
 # Run App
