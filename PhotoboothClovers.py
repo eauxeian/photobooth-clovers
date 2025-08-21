@@ -57,17 +57,19 @@ def _pending_only(records):
     return [o for o in records if o.get("Status", "").strip().lower() != "done"]
 
 def broadcast_queue():
-    """
-    Recalculate queue positions among *Pending* orders and broadcast to all clients.
-    Each item emitted contains at least: Name, Copies, Amount Paid, Status, (and QueueNumber).
-    """
-    records = _get_records()
-    active = _pending_only(records)
-    for idx, o in enumerate(active, start=1):
-        o["QueueNumber"] = idx
-    # NOTE: do not use broadcast kwarg (not supported in your setup)
-    socketio.emit("queue_update", active)
-    return active
+    """Recalculate queue positions and broadcast live to all clients."""
+    records = sheet.get_all_records()
+
+    # Only active (Pending) orders
+    active_orders = [o for o in records if o.get("Status", "").lower() == "pending"]
+
+    # Assign queue numbers dynamically (starting at 1)
+    for idx, order in enumerate(active_orders, start=1):
+        order["QueueNumber"] = idx
+
+    # Push update to all clients
+    socketio.emit("queue_update", active_orders)
+    return active_orders
 
 # ---------------------------------------------------------
 # Socket.IO events

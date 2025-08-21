@@ -117,16 +117,13 @@
         {% set pending = orders | selectattr("Status", "equalto", "Pending") | list %}
         {% for r in pending %}
           <tr>
-            <td>{{ loop.index }}</td>
+            <td>{{ loop.index }}</td> <!-- loop.index will be correct since we're looping over only Pending -->
             <td>{{ r["Name"] }}</td>
             <td>{{ r["Copies"] }}</td>
             <td>{{ r["Amount Paid"] }}</td>
           </tr>
         {% endfor %}
-        {% if pending|length == 0 %}
-          <tr><td colspan="4">No pending orders 🎉</td></tr>
-        {% endif %}
-      </tbody>
+    </tbody>
     </table>
     <div class="top-actions">
       <a href="{{ url_for('form') }}"><button class="btn-secondary" type="button">Back to Form</button></a>
@@ -214,9 +211,9 @@
             <td>${order.Name}</td>
             <td>${order.Copies}</td>
             <td>${order["Amount Paid"]}</td>
-          `;
-          tbody.appendChild(row);
-        });
+            `;
+            tbody.appendChild(row);
+          });
       }
     }
 
