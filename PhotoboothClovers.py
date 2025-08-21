@@ -5,15 +5,7 @@ from datetime import datetime
 
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from flask import (
-    Flask,
-    render_template,
-    request,
-    redirect,
-    url_for,
-    flash,
-    session,
-)
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_socketio import SocketIO
 
 # ---------------------------------------------------------
@@ -40,16 +32,12 @@ if not SPREADSHEET_ID:
 # ---------------------------------------------------------
 # Google Sheets Setup
 # ---------------------------------------------------------
-scope = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/drive",
-]
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds_dict = json.loads(GOOGLE_CREDS)
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 
 sheet = client.open_by_key(SPREADSHEET_ID).sheet1
-
 
 # ---------------------------------------------------------
 # Helpers
@@ -69,7 +57,6 @@ def broadcast_queue():
     socketio.emit("queue_update", active_orders)
     return active_orders
 
-
 # ---------------------------------------------------------
 # Routes
 # ---------------------------------------------------------
@@ -84,12 +71,13 @@ def submit():
     email = request.form.get("email", "").strip()
     copies = request.form.get("copies", "0").strip()
     amount = request.form.get("amount", "0").strip()
-    timestamp = request.form.get("timestamp")  # from client-side device
+    timestamp = request.form.get("timestamp", "").strip()
 
     # sanitize inputs
     name = re.sub(r"[^a-zA-Z0-9\s]", "", name)
     email = re.sub(r"[^a-zA-Z0-9@._-]", "", email)
 
+    # validate numbers
     try:
         copies = int(copies)
         amount = float(amount)
@@ -99,11 +87,19 @@ def submit():
         flash("Invalid input: Copies must be ≥1 and Amount ≥0.", "error")
         return redirect(url_for("form"))
 
+    # validate email domain if provided
+    allowed_domains = ["gmail.com", "up.edu.ph"]
+    if email:
+        domain = email.split("@")[-1].lower()
+        if domain not in allowed_domains:
+            flash("Only gmail.com or up.edu.ph emails are allowed.", "error")
+            return redirect(url_for("form"))
+
     # Generate ID
     records = sheet.get_all_records()
     new_id = len(records) + 1
 
-    # fallback timestamp (server) if client-side missing
+    # fallback timestamp if missing
     if not timestamp:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -111,24 +107,9 @@ def submit():
     sheet.append_row([new_id, name, email, copies, amount, "Pending", timestamp])
 
     # Broadcast live queue
-    active_orders = broadcast_queue()
+    broadcast_queue()
 
-    # Queue position = last index in active pending list
-    position = len(active_orders)
-
-    # store in session to prevent double submit
-    session["position"] = position
-
-    # ✅ Redirect to GET endpoint
-    return redirect(url_for("thanks"))
-
-
-@app.route("/thanks")
-def thanks():
-    position = session.pop("position", None)
-    if not position:
-        return redirect(url_for("form"))
-    return render_template("index.html", page="thanks", position=position)
+    return render_template("index.html", page="thanks", position=new_id)
 
 
 @app.route("/queue")
@@ -145,9 +126,7 @@ def admin():
             session["is_admin"] = True
             return redirect(url_for("dashboard"))
         else:
-            return render_template(
-                "index.html", page="login", error="Incorrect password."
-            )
+            return render_template("index.html", page="login", error="Incorrect password.")
 
     return render_template("index.html", page="login")
 

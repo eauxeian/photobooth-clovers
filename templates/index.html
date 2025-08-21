@@ -13,8 +13,8 @@
     input { padding:0.8rem; border:1px solid #ccc; border-radius:8px; }
     button { padding:0.8rem; border:none; border-radius:8px; background:#2e7d32; color:#fff; cursor:pointer; font-weight:bold; }
     button:hover { background:#256428; }
-    table { width:100%; border-collapse:collapse; margin-top:1rem; }
-    th, td { border:1px solid #ddd; padding:0.6rem; text-align:left; }
+    table { width:100%; border-collapse:collapse; margin-top:1rem; table-layout: fixed; }
+    th, td { border:1px solid #ddd; padding:0.6rem; text-align:left; word-wrap:break-word; white-space: normal; }
     th { background:#f0f0f0; }
     .badge { padding:0.2rem 0.6rem; border-radius:6px; font-size:0.85rem; font-weight:bold; }
     .pending { background:#ffecb3; color:#8a6d00; }
@@ -29,7 +29,7 @@
 
   {% if page == 'form' %}
     <h1>🍀 Clovers Photobooth 📸 — Order Form</h1>
-    <form action="{{ url_for('submit') }}" method="POST" onsubmit="return addTimestamp(this)">
+    <form action="{{ url_for('submit') }}" method="POST" onsubmit="return validateEmail(this)">
       <input type="text" name="name" placeholder="Full Name" required>
       <input type="email" name="email" placeholder="Email (optional)">
       <input type="number" name="copies" placeholder="Number of Copies" min="1" required>
@@ -96,7 +96,7 @@
           <tr>
             <td>{{ r["ID"] }}</td>
             <td>{{ r["Name"] }}</td>
-            <td>{{ r["Email"] }}</td>
+            <td style="max-width:150px; word-wrap:break-word; white-space:normal;">{{ r["Email"] }}</td>
             <td>{{ r["Copies"] }}</td>
             <td>{{ r["Amount Paid"] }}</td>
             <td><span class="badge {{ 'pending' if r['Status']=='Pending' else 'done' }}">{{ r["Status"] }}</span></td>
@@ -118,8 +118,8 @@
 <script>
   const socket = io();
 
-  // Attach device time before submitting
-  function addTimestamp(form) {
+  // Add timestamp before submitting
+  function addTimestamp() {
     const now = new Date();
     const ts = now.getFullYear() + "-" +
                String(now.getMonth()+1).padStart(2,"0") + "-" +
@@ -128,10 +128,24 @@
                String(now.getMinutes()).padStart(2,"0") + ":" +
                String(now.getSeconds()).padStart(2,"0");
     document.getElementById("timestamp").value = ts;
+  }
+
+  // Validate email domains
+  function validateEmail(form) {
+    addTimestamp();
+    const emailField = form.email.value.trim();
+    if (emailField.length === 0) return true; // optional
+
+    const allowedDomains = ["gmail.com", "up.edu.ph"];
+    const domain = emailField.split("@").pop().toLowerCase();
+    if (!allowedDomains.includes(domain)) {
+      alert("Only gmail.com or up.edu.ph emails are allowed.");
+      return false;
+    }
     return true;
   }
 
-  // Handle live queue updates
+  // Live queue updates
   socket.on("queue_update", (queue) => {
     if (window.location.pathname === "/queue") {
       const tbody = document.getElementById("queue-body");
@@ -153,7 +167,7 @@
       }
     }
     if (window.location.pathname === "/admin") {
-      window.location.reload(); // update admin instantly
+      window.location.reload(); // refresh admin instantly
     }
   });
 </script>
