@@ -54,7 +54,7 @@ def broadcast_queue():
         order["QueueNumber"] = idx
 
     # Push update to all clients
-    socketio.emit("queue_update", active_orders, broadcast=True)
+    socketio.emit("queue_update", active_orders)
     return active_orders
 
 # ---------------------------------------------------------

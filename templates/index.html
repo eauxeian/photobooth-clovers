@@ -52,19 +52,19 @@
   {% elif page == 'queue' %}
     <h1>📋 Live Queue</h1>
     <table>
-      <thead><tr><th>#</th><th>Name</th><th>Copies</th><th>Amount</th><th>Status</th></tr></thead>
+      <thead><tr><th>#</th><th>Name</th><th>Copies</th><th>Amount</th></tr></thead>
       <tbody id="queue-body">
-        {% for r in orders %}
+        {% set pending = orders | selectattr("Status", "equalto", "Pending") | list %}
+        {% for r in pending %}
           <tr>
             <td>{{ loop.index }}</td>
             <td>{{ r["Name"] }}</td>
             <td>{{ r["Copies"] }}</td>
             <td>{{ r["Amount Paid"] }}</td>
-            <td><span class="badge {{ 'pending' if r['Status']=='Pending' else 'done' }}">{{ r["Status"] }}</span></td>
           </tr>
         {% endfor %}
-        {% if orders|length == 0 %}
-          <tr><td colspan="5">No orders yet.</td></tr>
+        {% if pending|length == 0 %}
+          <tr><td colspan="4">No pending orders 🎉</td></tr>
         {% endif %}
       </tbody>
     </table>
@@ -122,17 +122,17 @@
     if (window.location.pathname === "/queue") {
       const tbody = document.getElementById("queue-body");
       tbody.innerHTML = "";
-      if (queue.length === 0) {
-        tbody.innerHTML = "<tr><td colspan='5'>No orders yet.</td></tr>";
+      const pending = queue.filter(o => o.Status === "Pending");
+      if (pending.length === 0) {
+        tbody.innerHTML = "<tr><td colspan='4'>No pending orders 🎉</td></tr>";
       } else {
-        queue.forEach((order, idx) => {
+        pending.forEach((order, idx) => {
           const row = document.createElement("tr");
           row.innerHTML = `
             <td>${idx + 1}</td>
             <td>${order.Name}</td>
             <td>${order.Copies}</td>
             <td>${order["Amount Paid"]}</td>
-            <td><span class="badge ${order.Status === "Pending" ? "pending" : "done"}">${order.Status}</span></td>
           `;
           tbody.appendChild(row);
         });
