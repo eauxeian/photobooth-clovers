@@ -28,7 +28,7 @@
 <div class="container">
 
   {% if page == 'form' %}
-    <h1>🍀 Clovers Photobooth — Order Form</h1>
+    <h1>🍀 Clovers Photobooth 📸 — Order Form</h1>
     <form action="{{ url_for('submit') }}" method="POST" onsubmit="return addTimestamp(this)">
       <input type="text" name="name" placeholder="Full Name" required>
       <input type="email" name="email" placeholder="Email (optional)">
