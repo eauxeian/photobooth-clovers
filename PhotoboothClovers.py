@@ -49,8 +49,8 @@ def valid_email(email: str) -> bool:
     return bool(re.match(r"^[^@]+@(gmail\.com|up\.edu\.ph)$", email, re.IGNORECASE))
 
 def _get_records():
-    """Get all records from the sheet (list of dicts)."""
-    return sheet.get_all_records()
+    expected_headers = ["ID", "Name", "Email", "Copies", "Amount Paid", "Status", "Timestamp"]
+    return sheet.get_all_records(expected_headers=expected_headers)
 
 def _pending_only(records):
     """Filter to Pending orders only."""
