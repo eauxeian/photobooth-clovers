@@ -22,7 +22,7 @@
     padding:1.5rem;
     border-radius:12px;
     box-shadow:0 2px 10px rgba(0,0,0,0.1);
-    overflow-x:auto; /* allow sideways scroll if table overflows */
+    overflow-x: auto;
   }
 
   h1 { text-align:center; }
@@ -81,17 +81,16 @@
     .container { max-width: 900px; }
   }
 </style>
+
 </head>
 <body>
 <div class="container">
 
   {% if page == 'form' %}
     <h1>🍀 Clovers Photobooth 📸 — Order Form</h1>
-    <form action="{{ url_for('submit') }}" method="POST" onsubmit="return addTimestamp(this)">
+    <form action="{{ url_for('submit') }}" method="POST" onsubmit="return validateForm(this)">
       <input type="text" name="name" placeholder="Full Name" required>
-      <input type="email" name="email" placeholder="Email (optional)"
-             pattern=".+@(gmail\.com|up\.edu\.ph)"
-             title="Only gmail.com or up.edu.ph emails allowed">
+      <input type="email" name="email" placeholder="Email (gmail.com or up.edu.ph only)">
       <input type="number" name="copies" placeholder="Number of Copies" min="1" required>
       <input type="number" name="amount" placeholder="Amount Paid" min="0" required>
       <input type="hidden" name="timestamp" id="timestamp">
@@ -178,7 +177,15 @@
 <script>
   const socket = io();
 
-  function addTimestamp(form) {
+  // Validate email + add device timestamp
+  function validateForm(form) {
+    const email = form.email.value.trim();
+    if (email) {
+      if (!(email.endsWith("@gmail.com") || email.endsWith("@up.edu.ph"))) {
+        alert("Only gmail.com or up.edu.ph emails are allowed.");
+        return false;
+      }
+    }
     const now = new Date();
     const ts = now.getFullYear() + "-" +
                String(now.getMonth()+1).padStart(2,"0") + "-" +
@@ -190,7 +197,9 @@
     return true;
   }
 
+  // Live updates
   socket.on("queue_update", (queue) => {
+    // Update queue page
     if (window.location.pathname === "/queue") {
       const tbody = document.getElementById("queue-body");
       tbody.innerHTML = "";
@@ -210,8 +219,29 @@
         });
       }
     }
+
+    // Update admin dashboard live
     if (window.location.pathname === "/admin") {
-      window.location.reload();
+      const tbody = document.getElementById("admin-body");
+      tbody.innerHTML = "";
+      queue.forEach(order => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${order.ID || ""}</td>
+          <td>${order.Name}</td>
+          <td>${order.Email}</td>
+          <td>${order.Copies}</td>
+          <td>${order["Amount Paid"]}</td>
+          <td><span class="badge ${order.Status === "Pending" ? "pending" : "done"}">${order.Status}</span></td>
+          <td>${order.Timestamp || ""}</td>
+          <td>
+            <form method="POST" action="/toggle/${order.ID}">
+              <button type="submit">${order.Status === "Pending" ? "Mark Done" : "Undo"}</button>
+            </form>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
     }
   });
 </script>
