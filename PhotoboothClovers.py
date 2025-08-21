@@ -5,7 +5,7 @@ from datetime import datetime
 
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_socketio import SocketIO
 
 # ---------------------------------------------------------
@@ -13,7 +13,8 @@ from flask_socketio import SocketIO
 # ---------------------------------------------------------
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev_secret")  # fallback
-socketio = SocketIO(app)
+# Allow same-origin & potential preview hosts; safe for this simple app
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # ---------------------------------------------------------
 # Environment Variables
@@ -36,26 +37,45 @@ scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/au
 creds_dict = json.loads(GOOGLE_CREDS)
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
-
 sheet = client.open_by_key(SPREADSHEET_ID).sheet1
 
 # ---------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------
+def valid_email(email: str) -> bool:
+    """Only allow gmail.com or up.edu.ph addresses, or empty (optional)."""
+    if not email:
+        return True
+    return bool(re.match(r"^[^@]+@(gmail\.com|up\.edu\.ph)$", email, re.IGNORECASE))
+
+def _get_records():
+    """Get all records from the sheet (list of dicts)."""
+    return sheet.get_all_records()
+
+def _pending_only(records):
+    """Filter to Pending orders only."""
+    return [o for o in records if o.get("Status", "").strip().lower() != "done"]
+
 def broadcast_queue():
-    """Recalculate queue positions and broadcast live to all clients."""
-    records = sheet.get_all_records()
+    """
+    Recalculate queue positions among *Pending* orders and broadcast to all clients.
+    Each item emitted contains at least: Name, Copies, Amount Paid, Status, (and QueueNumber).
+    """
+    records = _get_records()
+    active = _pending_only(records)
+    for idx, o in enumerate(active, start=1):
+        o["QueueNumber"] = idx
+    # NOTE: do not use broadcast kwarg (not supported in your setup)
+    socketio.emit("queue_update", active)
+    return active
 
-    # Only active (Pending) orders
-    active_orders = [o for o in records if o.get("Status", "").lower() != "done"]
-
-    # Assign queue numbers dynamically
-    for idx, order in enumerate(active_orders, start=1):
-        order["QueueNumber"] = idx
-
-    # Push update to all clients
-    socketio.emit("queue_update", active_orders)
-    return active_orders
+# ---------------------------------------------------------
+# Socket.IO events
+# ---------------------------------------------------------
+@socketio.on("connect")
+def on_connect():
+    # When a browser connects or refreshes, immediately send the current queue.
+    broadcast_queue()
 
 # ---------------------------------------------------------
 # Routes
@@ -64,11 +84,10 @@ def broadcast_queue():
 def form():
     return render_template("index.html", page="form")
 
-
 @app.route("/submit", methods=["POST"])
 def submit():
     name = request.form.get("name", "").strip()
-    email = request.form.get("email", "").strip()
+    email = request.form.get("email", "").strip().lower()
     copies = request.form.get("copies", "0").strip()
     amount = request.form.get("amount", "0").strip()
     timestamp = request.form.get("timestamp", "").strip()
@@ -77,7 +96,11 @@ def submit():
     name = re.sub(r"[^a-zA-Z0-9\s]", "", name)
     email = re.sub(r"[^a-zA-Z0-9@._-]", "", email)
 
-    # validate numbers
+    # validate email domain
+    if not valid_email(email):
+        flash("Only gmail.com or up.edu.ph emails are allowed.", "error")
+        return redirect(url_for("form"))
+
     try:
         copies = int(copies)
         amount = float(amount)
@@ -87,36 +110,31 @@ def submit():
         flash("Invalid input: Copies must be ≥1 and Amount ≥0.", "error")
         return redirect(url_for("form"))
 
-    # validate email domain if provided
-    allowed_domains = ["gmail.com", "up.edu.ph"]
-    if email:
-        domain = email.split("@")[-1].lower()
-        if domain not in allowed_domains:
-            flash("Only gmail.com or up.edu.ph emails are allowed.", "error")
-            return redirect(url_for("form"))
-
-    # Generate ID
-    records = sheet.get_all_records()
+    # Generate ID (simple: next row index after headers)
+    records = _get_records()
     new_id = len(records) + 1
 
-    # fallback timestamp if missing
+    # Use device time if provided, else server time
     if not timestamp:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Save to Google Sheets
+    # Append row: [ID, Name, Email, Copies, Amount Paid, Status, Timestamp]
     sheet.append_row([new_id, name, email, copies, amount, "Pending", timestamp])
 
-    # Broadcast live queue
+    # Broadcast live queue to everyone (including the submitter if they stay on the page)
     broadcast_queue()
 
-    return render_template("index.html", page="thanks", position=new_id)
+    # Redirect to thanks so refresh won't resubmit
+    return redirect(url_for("thanks", position=new_id))
 
+@app.route("/thanks/<int:position>")
+def thanks(position):
+    return render_template("index.html", page="thanks", position=position)
 
 @app.route("/queue")
 def queue():
-    orders = sheet.get_all_records()
+    orders = _get_records()
     return render_template("index.html", page="queue", orders=orders)
-
 
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
@@ -127,41 +145,42 @@ def admin():
             return redirect(url_for("dashboard"))
         else:
             return render_template("index.html", page="login", error="Incorrect password.")
-
     return render_template("index.html", page="login")
-
 
 @app.route("/dashboard")
 def dashboard():
     if not session.get("is_admin"):
         return redirect(url_for("admin"))
-
-    orders = sheet.get_all_records()
+    orders = _get_records()
     return render_template("index.html", page="admin", orders=orders)
-
 
 @app.route("/toggle/<int:order_id>", methods=["POST"])
 def toggle(order_id):
     if not session.get("is_admin"):
         return redirect(url_for("admin"))
 
-    data = sheet.get_all_records()
-    for idx, row in enumerate(data, start=2):  # start=2 because of headers
-        if row["ID"] == order_id:
-            new_status = "Done" if row["Status"] == "Pending" else "Pending"
-            sheet.update_cell(idx, 6, new_status)  # Status column is 6th
-            # Broadcast queue update
+    data = _get_records()
+    for idx, row in enumerate(data, start=2):  # +1 for 1-indexing, +1 for headers -> start at 2
+        if row.get("ID") == order_id:
+            new_status = "Done" if row.get("Status") == "Pending" else "Pending"
+            sheet.update_cell(idx, 6, new_status)  # col 6 is "Status"
             broadcast_queue()
             break
-
     return redirect(url_for("dashboard"))
-
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("admin"))
 
+# --- Optional small JSON API for debugging or future use ---
+@app.route("/api/queue")
+def api_queue():
+    records = _get_records()
+    active = _pending_only(records)
+    for idx, o in enumerate(active, start=1):
+        o["QueueNumber"] = idx
+    return jsonify(active)
 
 # ---------------------------------------------------------
 # Run App (for local dev, Render uses gunicorn)
