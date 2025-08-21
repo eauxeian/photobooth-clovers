@@ -1,42 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Photobooth Clovers</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8">
+  <title>🍀 Photobooth Clovers</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://cdn.socket.io/4.7.4/socket.io.min.js" crossorigin="anonymous"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --green: #2e7d32;
-      --green-dark: #256428;
-      --bg: #f5f9f6;
-      --text: #1a4d2e;
-      --muted: #9aa7a0;
-      --badge-pending-bg: #ffecb3;
-      --badge-pending-text: #8a6d00;
-      --badge-done-bg: #4a7a44;
-      --badge-done-text: #fff;
-    }
-    body { font-family:'Inter',sans-serif; background:var(--bg); margin:0; padding:2rem; color:var(--text);}
-    .container { max-width:600px; margin:auto; background:#fff; border-radius:16px; padding:2rem; box-shadow:0 6px 20px rgba(0,0,0,0.1);}
-    h1 { margin-bottom:1.5rem; text-align:center;}
-    form { display:flex; flex-direction:column; gap:1rem;}
-    input { padding:0.9rem 1rem; border:1px solid #cfd8d3; border-radius:10px; font-size:1rem; }
-    input:focus { border-color:var(--green); outline:none; }
-    .btn {border:none; border-radius:12px; padding:0.9rem; font-weight:600; cursor:pointer; transition:0.2s; background:var(--green); color:#fff; font-size:1rem;}
-    .btn:hover { background:var(--green-dark);}
-    .btn-secondary { background:#f0f3f1; color:var(--text);}
-    .btn-secondary:hover { background:#e8eeea;}
-    table { width:100%; border-collapse:collapse; margin-top:1rem;}
-    th,td { text-align:left; padding:0.75rem;}
-    th { background:#e6f5ec;}
-    tr:nth-child(even) { background:#f9f9f9;}
-    .badge { padding:0.25rem 0.6rem; border-radius:12px; font-weight:600; font-size:0.85rem;}
-    .badge.pending { background:var(--badge-pending-bg); color:var(--badge-pending-text);}
-    .badge.done { background:var(--badge-done-bg); color:var(--badge-done-text);}
-    .top-actions { display:flex; gap:0.5rem; justify-content:center; margin-top:1.5rem; flex-wrap:wrap;}
-    .clover { font-size:1.2rem; margin-right:0.3rem; }
+    body { font-family: sans-serif; background:#f9f9f9; margin:0; padding:2rem; color:#333; }
+    .container { max-width:600px; margin:auto; background:#fff; padding:2rem; border-radius:12px; box-shadow:0 2px 10px rgba(0,0,0,0.1); }
+    h1 { text-align:center; }
+    form { display:flex; flex-direction:column; gap:1rem; }
+    input { padding:0.8rem; border:1px solid #ccc; border-radius:8px; }
+    button { padding:0.8rem; border:none; border-radius:8px; background:#2e7d32; color:#fff; cursor:pointer; font-weight:bold; }
+    button:hover { background:#256428; }
+    table { width:100%; border-collapse:collapse; margin-top:1rem; }
+    th, td { border:1px solid #ddd; padding:0.6rem; text-align:left; }
+    th { background:#f0f0f0; }
+    .badge { padding:0.2rem 0.6rem; border-radius:6px; font-size:0.85rem; font-weight:bold; }
+    .pending { background:#ffecb3; color:#8a6d00; }
+    .done { background:#4a7a44; color:#fff; }
+    .top-actions { margin-top:1rem; display:flex; gap:0.5rem; justify-content:center; flex-wrap:wrap; }
+    .btn-secondary { background:#eee; color:#333; }
+    .btn-secondary:hover { background:#ddd; }
   </style>
 </head>
 <body>
@@ -44,66 +29,66 @@
 
   {% if page == 'form' %}
     <h1>🍀 Photobooth Clovers — Order Form</h1>
-    <form action="{{ url_for('submit') }}" method="POST" autocomplete="off">
+    <form action="{{ url_for('submit') }}" method="POST">
       <input type="text" name="name" placeholder="Full Name" required>
       <input type="email" name="email" placeholder="Email (optional)">
-      <input type="number" name="copies" placeholder="Number of Copies" required min="1">
-      <input type="number" name="amount" placeholder="Amount Paid" required min="0">
-      <button type="submit" class="btn">🍀 Submit Order</button>
+      <input type="number" name="copies" placeholder="Number of Copies" min="1" required>
+      <input type="number" name="amount" placeholder="Amount Paid" min="0" required>
+      <button type="submit">Submit Order</button>
     </form>
     <div class="top-actions">
-      <a href="{{ url_for('queue') }}" class="btn btn-secondary">🔎 View Live Queue</a>
-      <a href="{{ url_for('admin') }}" class="btn btn-secondary">🛠 Admin</a>
+      <a href="{{ url_for('queue') }}"><button class="btn-secondary">View Queue</button></a>
+      <a href="{{ url_for('admin') }}"><button class="btn-secondary">Admin</button></a>
     </div>
 
   {% elif page == 'thanks' %}
     <h1>✅ Order Submitted!</h1>
-    <p style="text-align:center;">🎟️ Your queue number: <b>#{{ position }}</b></p>
+    <p style="text-align:center;">Your queue number: <b>#{{ position }}</b></p>
     <div class="top-actions">
-      <a href="{{ url_for('queue') }}" class="btn">Go to Live Queue</a>
-      <a href="{{ url_for('form') }}" class="btn btn-secondary">Submit Another</a>
+      <a href="{{ url_for('queue') }}"><button>Go to Queue</button></a>
+      <a href="{{ url_for('form') }}"><button class="btn-secondary">Submit Another</button></a>
     </div>
 
   {% elif page == 'queue' %}
     <h1>📋 Live Queue</h1>
     <table>
-      <thead><tr><th>#</th><th>Name</th><th>Copies</th><th>Amount</th><th>Status</th></tr></thead>
+      <thead><tr><th>ID</th><th>Name</th><th>Copies</th><th>Amount</th><th>Status</th></tr></thead>
       <tbody>
         {% for r in orders %}
           <tr>
-            <td>{{ loop.index }}</td>
+            <td>{{ r["ID"] }}</td>
             <td>{{ r["Name"] }}</td>
             <td>{{ r["Copies"] }}</td>
             <td>{{ r["Amount Paid"] }}</td>
-            <td><span class="badge pending">Pending</span></td>
+            <td><span class="badge {{ 'pending' if r['Status']=='Pending' else 'done' }}">{{ r["Status"] }}</span></td>
           </tr>
         {% endfor %}
         {% if orders|length == 0 %}
-          <tr><td colspan="5" style="color:var(--muted);">No pending orders right now.</td></tr>
+          <tr><td colspan="5">No orders yet.</td></tr>
         {% endif %}
       </tbody>
     </table>
     <div class="top-actions">
-      <a href="{{ url_for('form') }}" class="btn btn-secondary">⬅ Back to Form</a>
+      <a href="{{ url_for('form') }}"><button class="btn-secondary">Back to Form</button></a>
     </div>
 
   {% elif page == 'login' %}
     <h1>🔑 Admin Login</h1>
-    <form method="POST" style="display:flex; flex-direction:column; gap:1rem;">
+    <form method="POST">
       <input type="password" name="password" placeholder="Admin Password" required>
-      <button type="submit" class="btn">Login</button>
+      <button type="submit">Login</button>
     </form>
-    {% if error %}<p style="color:#b00020">{{ error }}</p>{% endif %}
+    {% if error %}<p style="color:red">{{ error }}</p>{% endif %}
 
   {% elif page == 'admin' %}
     <h1>🛠 Admin Dashboard</h1>
     <div class="top-actions">
-      <a href="{{ url_for('logout') }}" class="btn btn-secondary">Logout</a>
-      <a href="{{ url_for('queue') }}" class="btn btn-secondary">View Queue</a>
+      <a href="{{ url_for('logout') }}"><button class="btn-secondary">Logout</button></a>
+      <a href="{{ url_for('queue') }}"><button class="btn-secondary">View Queue</button></a>
     </div>
     <table>
       <thead>
-        <tr><th>#</th><th>Name</th><th>Email</th><th>Copies</th><th>Amount</th><th>Status</th><th>Updated</th><th>Action</th></tr>
+        <tr><th>ID</th><th>Name</th><th>Email</th><th>Copies</th><th>Amount</th><th>Status</th><th>Timestamp</th><th>Action</th></tr>
       </thead>
       <tbody>
         {% for r in orders %}
@@ -117,7 +102,7 @@
             <td>{{ r["Timestamp"] }}</td>
             <td>
               <form method="POST" action="{{ url_for('toggle', order_id=r['ID']) }}">
-                <button class="btn" type="submit">
+                <button type="submit">
                   {% if r["Status"] == "Pending" %}Mark Done{% else %}Undo{% endif %}
                 </button>
               </form>
@@ -132,8 +117,7 @@
 <script>
   const socket = io();
   socket.on("orders_updated", () => {
-    const path = window.location.pathname;
-    if (path === "/queue" || path === "/admin") {
+    if (window.location.pathname === "/queue" || window.location.pathname === "/admin") {
       window.location.reload();
     }
   });

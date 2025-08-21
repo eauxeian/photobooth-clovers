@@ -1,33 +1,33 @@
 import os
-import eventlet
-print("Eventlet version:", eventlet.__version__)
-import re
 import json
-import eventlet
-eventlet.monkey_patch(dns=False)
+import re
+from datetime import datetime
+
 import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_socketio import SocketIO
-from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime
 
 # ---------------------------------------------------------
 # Flask + SocketIO Setup
 # ---------------------------------------------------------
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev_secret")  # dev fallback
+app.secret_key = os.environ.get("SECRET_KEY", "dev_secret")  # fallback
 socketio = SocketIO(app)
 
 # ---------------------------------------------------------
 # Environment Variables
 # ---------------------------------------------------------
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
+GOOGLE_CREDS = os.environ.get("GOOGLE_CREDS")
+SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID")
+
 if not ADMIN_PASSWORD:
     raise RuntimeError("ADMIN_PASSWORD must be set as an environment variable")
-
-GOOGLE_CREDS = os.environ.get("GOOGLE_CREDS")
 if not GOOGLE_CREDS:
     raise RuntimeError("GOOGLE_CREDS must be set as an environment variable")
+if not SPREADSHEET_ID:
+    raise RuntimeError("SPREADSHEET_ID must be set as an environment variable")
 
 # ---------------------------------------------------------
 # Google Sheets Setup
@@ -37,9 +37,7 @@ creds_dict = json.loads(GOOGLE_CREDS)
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 
-SPREADSHEET_ID = "19j-OddWhztjAPP3y3RobEeU4nM9ejJlFy2ZoHGKPShM"
 sheet = client.open_by_key(SPREADSHEET_ID).sheet1
-
 
 # ---------------------------------------------------------
 # Routes
@@ -56,7 +54,7 @@ def submit():
     copies = request.form.get("copies", "0").strip()
     amount = request.form.get("amount", "0").strip()
 
-    # ✅ Sanitize
+    # sanitize inputs
     name = re.sub(r"[^a-zA-Z0-9\s]", "", name)
     email = re.sub(r"[^a-zA-Z0-9@._-]", "", email)
 
@@ -69,16 +67,15 @@ def submit():
         flash("Invalid input: Copies must be ≥1 and Amount ≥0.", "error")
         return redirect(url_for("form"))
 
-    # Generate ID and timestamp
+    # Generate ID + timestamp
     records = sheet.get_all_records()
     new_id = len(records) + 1
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Append new row
+    # Save to Google Sheets
     sheet.append_row([new_id, name, email, copies, amount, "Pending", timestamp])
     socketio.emit("orders_updated", {})
 
-    # Redirect to thanks page
     return render_template("index.html", page="thanks", position=new_id)
 
 
@@ -133,7 +130,7 @@ def logout():
 
 
 # ---------------------------------------------------------
-# Run App
+# Run App (for local dev, Render uses gunicorn)
 # ---------------------------------------------------------
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
