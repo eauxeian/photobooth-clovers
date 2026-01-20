@@ -12,8 +12,7 @@ from flask_socketio import SocketIO
 # Flask + SocketIO Setup
 # ---------------------------------------------------------
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev_secret")  # fallback
-# Allow same-origin & potential preview hosts; safe for this simple app
+app.secret_key = os.environ.get("SECRET_KEY", "dev_secret")
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # ---------------------------------------------------------
@@ -24,16 +23,19 @@ GOOGLE_CREDS = os.environ.get("GOOGLE_CREDS")
 SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID")
 
 if not ADMIN_PASSWORD:
-    raise RuntimeError("ADMIN_PASSWORD must be set as an environment variable")
+    raise RuntimeError("ADMIN_PASSWORD must be set")
 if not GOOGLE_CREDS:
-    raise RuntimeError("GOOGLE_CREDS must be set as an environment variable")
+    raise RuntimeError("GOOGLE_CREDS must be set")
 if not SPREADSHEET_ID:
-    raise RuntimeError("SPREADSHEET_ID must be set as an environment variable")
+    raise RuntimeError("SPREADSHEET_ID must be set")
 
 # ---------------------------------------------------------
 # Google Sheets Setup
 # ---------------------------------------------------------
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+scope = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/drive",
+]
 creds_dict = json.loads(GOOGLE_CREDS)
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
@@ -43,40 +45,44 @@ sheet = client.open_by_key(SPREADSHEET_ID).sheet1
 # Helpers
 # ---------------------------------------------------------
 def valid_email(email: str) -> bool:
-    """Only allow gmail.com or up.edu.ph addresses, or empty (optional)."""
     if not email:
         return True
-    return bool(re.match(r"^[^@]+@(gmail\.com|up\.edu\.ph)$", email, re.IGNORECASE))
+    return bool(
+        re.match(r"^[^@]+@(gmail\.com|up\.edu\.ph)$", email, re.IGNORECASE)
+    )
 
 def _get_records():
-    expected_headers = ["ID", "Name", "Email", "Copies", "Amount Paid", "Status", "Timestamp"]
+    expected_headers = [
+        "ID",
+        "Name",
+        "Email",
+        "Copies",
+        "Amount Paid",
+        "Status",
+        "Printed",
+        "Claimed",
+        "Timestamp",
+    ]
     return sheet.get_all_records(expected_headers=expected_headers)
 
 def _pending_only(records):
-    """Filter to Pending orders only."""
-    return [o for o in records if o.get("Status", "").strip().lower() != "done"]
+    return [o for o in records if o.get("Status", "").lower() == "pending"]
 
 def broadcast_queue():
-    """Recalculate queue positions and broadcast live to all clients."""
-    records = sheet.get_all_records()
+    records = _get_records()
+    active_orders = _pending_only(records)
 
-    # Only active (Pending) orders
-    active_orders = [o for o in records if o.get("Status", "").lower() == "pending"]
-
-    # Assign queue numbers dynamically (starting at 1)
     for idx, order in enumerate(active_orders, start=1):
         order["QueueNumber"] = idx
 
-    # Push update to all clients
     socketio.emit("queue_update", active_orders)
     return active_orders
 
 # ---------------------------------------------------------
-# Socket.IO events
+# Socket.IO
 # ---------------------------------------------------------
 @socketio.on("connect")
 def on_connect():
-    # When a browser connects or refreshes, immediately send the current queue.
     broadcast_queue()
 
 # ---------------------------------------------------------
@@ -90,17 +96,15 @@ def form():
 def submit():
     name = request.form.get("name", "").strip()
     email = request.form.get("email", "").strip().lower()
-    copies = request.form.get("copies", "0").strip()
-    amount = request.form.get("amount", "0").strip()
-    timestamp = request.form.get("timestamp", "").strip()
+    copies = request.form.get("copies", "0")
+    amount = request.form.get("amount", "0")
+    timestamp = request.form.get("timestamp", "")
 
-    # sanitize inputs
     name = re.sub(r"[^a-zA-Z0-9\s]", "", name)
     email = re.sub(r"[^a-zA-Z0-9@._-]", "", email)
 
-    # validate email domain
     if not valid_email(email):
-        flash("Only gmail.com or up.edu.ph emails are allowed.", "error")
+        flash("Only gmail.com or up.edu.ph emails allowed.", "error")
         return redirect(url_for("form"))
 
     try:
@@ -109,24 +113,28 @@ def submit():
         if copies < 1 or amount < 0:
             raise ValueError
     except ValueError:
-        flash("Invalid input: Copies must be ≥1 and Amount ≥0.", "error")
+        flash("Invalid input.", "error")
         return redirect(url_for("form"))
 
-    # Generate ID (simple: next row index after headers)
     records = _get_records()
     new_id = len(records) + 1
 
-    # Use device time if provided, else server time
     if not timestamp:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Append row: [ID, Name, Email, Copies, Amount Paid, Status, Timestamp]
-    sheet.append_row([new_id, name, email, copies, amount, "Pending", timestamp])
+    sheet.append_row([
+        new_id,
+        name,
+        email,
+        copies,
+        amount,
+        "Pending",   # Status
+        "No",        # Printed
+        "No",        # Claimed
+        timestamp,
+    ])
 
-    # Broadcast live queue to everyone (including the submitter if they stay on the page)
     broadcast_queue()
-
-    # Redirect to thanks so refresh won't resubmit
     return redirect(url_for("thanks", position=new_id))
 
 @app.route("/thanks/<int:position>")
@@ -138,15 +146,16 @@ def queue():
     orders = _get_records()
     return render_template("index.html", page="queue", orders=orders)
 
+# ---------------------------------------------------------
+# Admin
+# ---------------------------------------------------------
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
     if request.method == "POST":
-        password = request.form.get("password", "")
-        if password == ADMIN_PASSWORD:
+        if request.form.get("password") == ADMIN_PASSWORD:
             session["is_admin"] = True
             return redirect(url_for("dashboard"))
-        else:
-            return render_template("index.html", page="login", error="Incorrect password.")
+        return render_template("index.html", page="login", error="Wrong password")
     return render_template("index.html", page="login")
 
 @app.route("/dashboard")
@@ -157,17 +166,50 @@ def dashboard():
     return render_template("index.html", page="admin", orders=orders)
 
 @app.route("/toggle/<int:order_id>", methods=["POST"])
-def toggle(order_id):
+def toggle_status(order_id):
     if not session.get("is_admin"):
         return redirect(url_for("admin"))
 
     data = _get_records()
-    for idx, row in enumerate(data, start=2):  # +1 for 1-indexing, +1 for headers -> start at 2
+    for idx, row in enumerate(data, start=2):
         if row.get("ID") == order_id:
             new_status = "Done" if row.get("Status") == "Pending" else "Pending"
-            sheet.update_cell(idx, 6, new_status)  # col 6 is "Status"
+            sheet.update_cell(idx, 6, new_status)
+
+            if new_status == "Done":
+                sheet.update_cell(idx, 7, "Yes")  # Printed
+
             broadcast_queue()
             break
+
+    return redirect(url_for("dashboard"))
+
+@app.route("/toggle_printed/<int:order_id>", methods=["POST"])
+def toggle_printed(order_id):
+    if not session.get("is_admin"):
+        return redirect(url_for("admin"))
+
+    data = _get_records()
+    for idx, row in enumerate(data, start=2):
+        if row.get("ID") == order_id:
+            new_val = "Yes" if row.get("Printed") != "Yes" else "No"
+            sheet.update_cell(idx, 7, new_val)
+            break
+
+    return redirect(url_for("dashboard"))
+
+@app.route("/toggle_claimed/<int:order_id>", methods=["POST"])
+def toggle_claimed(order_id):
+    if not session.get("is_admin"):
+        return redirect(url_for("admin"))
+
+    data = _get_records()
+    for idx, row in enumerate(data, start=2):
+        if row.get("ID") == order_id:
+            new_val = "Yes" if row.get("Claimed") != "Yes" else "No"
+            sheet.update_cell(idx, 8, new_val)
+            break
+
     return redirect(url_for("dashboard"))
 
 @app.route("/logout")
@@ -175,17 +217,22 @@ def logout():
     session.clear()
     return redirect(url_for("admin"))
 
-# --- Optional small JSON API for debugging or future use ---
+# ---------------------------------------------------------
+# API
+# ---------------------------------------------------------
 @app.route("/api/queue")
 def api_queue():
-    records = _get_records()
-    active = _pending_only(records)
+    active = _pending_only(_get_records())
     for idx, o in enumerate(active, start=1):
         o["QueueNumber"] = idx
     return jsonify(active)
 
 # ---------------------------------------------------------
-# Run App (for local dev, Render uses gunicorn)
+# Run
 # ---------------------------------------------------------
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    socketio.run(
+        app,
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000)),
+    )
