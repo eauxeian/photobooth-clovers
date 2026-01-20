@@ -5,239 +5,290 @@
   <title>🍀 Photobooth Clovers</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://cdn.socket.io/4.7.4/socket.io.min.js" crossorigin="anonymous"></script>
-<style>
-  body {
-    font-family: sans-serif;
-    background:#f9f9f9;
-    margin:0;
-    padding:1rem;
-    color:#333;
-  }
 
-  .container {
-    max-width: 95%;
-    width: 100%;
-    margin:auto;
-    background:#fff;
-    padding:1.5rem;
-    border-radius:12px;
-    box-shadow:0 2px 10px rgba(0,0,0,0.1);
-    overflow-x: auto;
-  }
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f9f9f9;
+      margin: 0;
+      padding: 1rem;
+      color: #333;
+    }
 
-  h1 { text-align:center; }
+    .container {
+      max-width: 95%;
+      margin: auto;
+      background: #fff;
+      padding: 1.5rem;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      overflow-x: auto;
+    }
 
-  form { display:flex; flex-direction:column; gap:1rem; }
-  input { padding:0.8rem; border:1px solid #ccc; border-radius:8px; }
-  button {
-    padding:0.8rem;
-    border:none;
-    border-radius:8px;
-    background:#2e7d32;
-    color:#fff;
-    cursor:pointer;
-    font-weight:bold;
-  }
-  button:hover { background:#256428; }
+    h1 { text-align: center; }
 
-  table {
-    width:100%;
-    border-collapse:collapse;
-    margin-top:1rem;
-    table-layout:auto;
-    word-break: break-word;
-  }
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
 
-  th, td {
-    border:1px solid #ddd;
-    padding:0.6rem;
-    text-align:left;
-  }
+    input {
+      padding: 0.8rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
 
-  th { background:#f0f0f0; }
+    button {
+      padding: 0.8rem;
+      border: none;
+      border-radius: 8px;
+      background: #2e7d32;
+      color: #fff;
+      font-weight: bold;
+      cursor: pointer;
+    }
 
-  .badge {
-    padding:0.2rem 0.6rem;
-    border-radius:6px;
-    font-size:0.85rem;
-    font-weight:bold;
-  }
+    button:hover { background: #256428; }
 
-  .pending { background:#ffecb3; color:#8a6d00; }
-  .done { background:#4a7a44; color:#fff; }
+    .btn-secondary {
+      background: #eee;
+      color: #333;
+    }
 
-  .top-actions {
-    margin-top:1rem;
-    display:flex;
-    gap:0.5rem;
-    justify-content:center;
-    flex-wrap:wrap;
-  }
+    .btn-secondary:hover { background: #ddd; }
 
-  .btn-secondary { background:#eee; color:#333; }
-  .btn-secondary:hover { background:#ddd; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      word-break: break-word;
+    }
 
-  @media (min-width: 768px) {
-    .container { max-width: 900px; }
-  }
-</style>
+    th, td {
+      border: 1px solid #ddd;
+      padding: 0.6rem;
+      text-align: left;
+    }
 
+    th { background: #f0f0f0; }
+
+    .badge {
+      padding: 0.2rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: bold;
+    }
+
+    .pending {
+      background: #ffecb3;
+      color: #8a6d00;
+    }
+
+    .done {
+      background: #4a7a44;
+      color: #fff;
+    }
+
+    .top-actions {
+      margin-top: 1rem;
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    @media (min-width: 768px) {
+      .container { max-width: 900px; }
+    }
+  </style>
 </head>
+
 <body>
 <div class="container">
 
-  {% if page == 'form' %}
-    <h1>🍀 Clovers Photobooth 📸 — Order Form</h1>
-    <form action="{{ url_for('submit') }}" method="POST" onsubmit="return validateForm(this)">
-      <input type="text" name="name" placeholder="Full Name" required>
-      <input type="email" name="email" placeholder="Email (gmail.com or up.edu.ph only)">
-      <input type="number" name="copies" placeholder="Number of Copies" min="1" required>
-      <input type="number" name="amount" placeholder="Amount Paid" min="0" required>
-      <input type="hidden" name="timestamp" id="timestamp">
-      <button type="submit">Submit Order</button>
-    </form>
-    <div class="top-actions">
-      <a href="{{ url_for('queue') }}"><button class="btn-secondary" type="button">View Queue</button></a>
-      <a href="{{ url_for('admin') }}"><button class="btn-secondary" type="button">Admin</button></a>
-    </div>
+{% if page == "form" %}
+  <h1>🍀 Clovers Photobooth 📸 — Order Form</h1>
 
-  {% elif page == 'thanks' %}
-    <h1>✅ Order Submitted! Thank you! 😎</h1>
-    <p style="text-align:center;">Your queue number: <b>#{{ position }}</b></p>
-    <div class="top-actions">
-      <a href="{{ url_for('queue') }}"><button type="button">Go to Queue</button></a>
-      <a href="{{ url_for('form') }}"><button class="btn-secondary" type="button">Submit Another</button></a>
-    </div>
+  <form method="POST" action="{{ url_for('submit') }}" onsubmit="return validateForm(this)">
+    <input type="text" name="name" placeholder="Full Name" required>
+    <input type="email" name="email" placeholder="Email (gmail.com or up.edu.ph only)">
+    <input type="number" name="copies" placeholder="Number of Copies" min="1" required>
+    <input type="number" name="amount" placeholder="Amount Paid" min="0" required>
+    <input type="hidden" name="timestamp" id="timestamp">
+    <button type="submit">Submit Order</button>
+  </form>
 
-  {% elif page == 'queue' %}
-    <h1>📋 Live Queue</h1>
-    <table>
-      <thead><tr><th>#</th><th>Name</th><th>Copies</th><th>Amount</th></tr></thead>
-      <tbody id="queue-body">
-        {% set pending = orders | selectattr("Status", "equalto", "Pending") | list %}
-        {% for r in pending %}
-          <tr>
-            <td>{{ loop.index }}</td> <!-- loop.index will be correct since we're looping over only Pending -->
-            <td>{{ r["Name"] }}</td>
-            <td>{{ r["Copies"] }}</td>
-            <td>{{ r["Amount Paid"] }}</td>
-          </tr>
-        {% endfor %}
+  <div class="top-actions">
+    <a href="{{ url_for('queue') }}"><button type="button" class="btn-secondary">View Queue</button></a>
+    <a href="{{ url_for('admin') }}"><button type="button" class="btn-secondary">Admin</button></a>
+  </div>
+
+{% elif page == "thanks" %}
+  <h1>✅ Order Submitted!</h1>
+  <p style="text-align:center;">Your queue number: <b>#{{ position }}</b></p>
+
+  <div class="top-actions">
+    <a href="{{ url_for('queue') }}"><button type="button">View Queue</button></a>
+    <a href="{{ url_for('form') }}"><button type="button" class="btn-secondary">Submit Another</button></a>
+  </div>
+
+{% elif page == "queue" %}
+  <h1>📋 Live Queue</h1>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Copies</th>
+        <th>Amount</th>
+      </tr>
+    </thead>
+    <tbody id="queue-body">
+      {% set pending = orders | selectattr("Status", "equalto", "Pending") | list %}
+      {% for r in pending %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ r["Name"] }}</td>
+          <td>{{ r["Copies"] }}</td>
+          <td>{{ r["Amount Paid"] }}</td>
+        </tr>
+      {% endfor %}
     </tbody>
-    </table>
-    <div class="top-actions">
-      <a href="{{ url_for('form') }}"><button class="btn-secondary" type="button">Back to Form</button></a>
-    </div>
+  </table>
 
-  {% elif page == 'login' %}
-    <h1>🔑 Admin Login</h1>
-    <form method="POST">
-      <input type="password" name="password" placeholder="Admin Password" required>
-      <button type="submit">Login</button>
-    </form>
-    {% if error %}<p style="color:red">{{ error }}</p>{% endif %}
+  <div class="top-actions">
+    <a href="{{ url_for('form') }}"><button type="button" class="btn-secondary">Back</button></a>
+  </div>
 
-  {% elif page == 'admin' %}
-    <h1>🛠 Admin Dashboard</h1>
-    <div class="top-actions">
-      <a href="{{ url_for('logout') }}"><button class="btn-secondary" type="button">Logout</button></a>
-      <a href="{{ url_for('queue') }}"><button class="btn-secondary" type="button">View Queue</button></a>
-    </div>
-    <table>
-      <thead>
-        <tr><th>ID</th><th>Name</th><th>Email</th><th>Copies</th><th>Amount</th><th>Status</th><th>Timestamp</th><th>Action</th></tr>
-      </thead>
-      <tbody id="admin-body">
-        {% for r in orders %}
-          <tr>
-            <td>{{ r["ID"] }}</td>
-            <td>{{ r["Name"] }}</td>
-            <td>{{ r["Email"] }}</td>
-            <td>{{ r["Copies"] }}</td>
-            <td>{{ r["Amount Paid"] }}</td>
-            <td><span class="badge {{ 'pending' if r['Status']=='Pending' else 'done' }}">{{ r["Status"] }}</span></td>
-            <td>{{ r["Timestamp"] }}</td>
-            <td>
-              <form method="POST" action="{{ url_for('toggle', order_id=r['ID']) }}">
-                <button type="submit">
-                  {% if r["Status"] == "Pending" %}Mark Done{% else %}Undo{% endif %}
-                </button>
-              </form>
-            </td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+{% elif page == "login" %}
+  <h1>🔑 Admin Login</h1>
+
+  <form method="POST">
+    <input type="password" name="password" placeholder="Admin Password" required>
+    <button type="submit">Login</button>
+  </form>
+
+  {% if error %}
+    <p style="color:red; text-align:center;">{{ error }}</p>
   {% endif %}
+
+{% elif page == "admin" %}
+  <h1>🛠 Admin Dashboard</h1>
+
+  <div class="top-actions">
+    <a href="{{ url_for('logout') }}"><button type="button" class="btn-secondary">Logout</button></a>
+    <a href="{{ url_for('queue') }}"><button type="button" class="btn-secondary">View Queue</button></a>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Copies</th>
+        <th>Amount</th>
+        <th>Status</th>
+        <th>Timestamp</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="admin-body">
+      {% for r in orders %}
+      <tr>
+        <td>{{ r["ID"] }}</td>
+        <td>{{ r["Name"] }}</td>
+        <td>{{ r["Email"] }}</td>
+        <td>{{ r["Copies"] }}</td>
+        <td>{{ r["Amount Paid"] }}</td>
+        <td>
+          <span class="badge {{ 'pending' if r['Status']=='Pending' else 'done' }}">
+            {{ r["Status"] }}
+          </span>
+        </td>
+        <td>{{ r["Timestamp"] }}</td>
+        <td>
+          <form method="POST" action="{{ url_for('toggle_status', order_id=r['ID']) }}">
+            <button type="submit">
+              {{ "Mark Done" if r["Status"] == "Pending" else "Undo" }}
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endif %}
+
 </div>
 
 <script>
   const socket = io();
+  const TOGGLE_BASE = "{{ url_for('toggle_status', order_id=0) }}".replace("0", "");
 
-  // Validate email + add device timestamp
   function validateForm(form) {
     const email = form.email.value.trim();
-    if (email) {
-      if (!(email.endsWith("@gmail.com") || email.endsWith("@up.edu.ph"))) {
-        alert("Only gmail.com or up.edu.ph emails are allowed.");
-        return false;
-      }
+    if (email && !(email.endsWith("@gmail.com") || email.endsWith("@up.edu.ph"))) {
+      alert("Only gmail.com or up.edu.ph emails allowed.");
+      return false;
     }
+
     const now = new Date();
-    const ts = now.getFullYear() + "-" +
-               String(now.getMonth()+1).padStart(2,"0") + "-" +
-               String(now.getDate()).padStart(2,"0") + " " +
-               String(now.getHours()).padStart(2,"0") + ":" +
-               String(now.getMinutes()).padStart(2,"0") + ":" +
-               String(now.getSeconds()).padStart(2,"0");
-    document.getElementById("timestamp").value = ts;
+    document.getElementById("timestamp").value =
+      now.getFullYear() + "-" +
+      String(now.getMonth()+1).padStart(2,"0") + "-" +
+      String(now.getDate()).padStart(2,"0") + " " +
+      String(now.getHours()).padStart(2,"0") + ":" +
+      String(now.getMinutes()).padStart(2,"0") + ":" +
+      String(now.getSeconds()).padStart(2,"0");
+
     return true;
   }
 
-  // Live updates
-  socket.on("queue_update", (queue) => {
-    // Update queue page
+  socket.on("queue_update", queue => {
     if (window.location.pathname === "/queue") {
       const tbody = document.getElementById("queue-body");
       tbody.innerHTML = "";
+
       const pending = queue.filter(o => o.Status === "Pending");
-      if (pending.length === 0) {
+      if (!pending.length) {
         tbody.innerHTML = "<tr><td colspan='4'>No pending orders 🎉</td></tr>";
-      } else {
-        pending.forEach((order, idx) => {
-          const row = document.createElement("tr");
-          row.innerHTML = `
-            <td>${idx + 1}</td>
-            <td>${order.Name}</td>
-            <td>${order.Copies}</td>
-            <td>${order["Amount Paid"]}</td>
-            `;
-            tbody.appendChild(row);
-          });
+        return;
       }
+
+      pending.forEach((o, i) => {
+        tbody.innerHTML += `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${o.Name}</td>
+            <td>${o.Copies}</td>
+            <td>${o["Amount Paid"]}</td>
+          </tr>`;
+      });
     }
 
-    // Update admin dashboard live
-    if (window.location.pathname === "/admin") {
+    if (window.location.pathname === "/dashboard") {
       const tbody = document.getElementById("admin-body");
       tbody.innerHTML = "";
-      queue.forEach(order => {
-        const row = document.createElement("tr");
-        row.innerHTML = `
-          <td>${order.ID || ""}</td>
-          <td>${order.Name}</td>
-          <td>${order.Email}</td>
-          <td>${order.Copies}</td>
-          <td>${order["Amount Paid"]}</td>
-          <td><span class="badge ${order.Status === "Pending" ? "pending" : "done"}">${order.Status}</span></td>
-          <td>${order.Timestamp || ""}</td>
-          <td>
-            <form method="POST" action="/toggle/${order.ID}">
-              <button type="submit">${order.Status === "Pending" ? "Mark Done" : "Undo"}</button>
-            </form>
-          </td>
-        `;
-        tbody.appendChild(row);
+
+      queue.forEach(o => {
+        tbody.innerHTML += `
+          <tr>
+            <td>${o.ID}</td>
+            <td>${o.Name}</td>
+            <td>${o.Email}</td>
+            <td>${o.Copies}</td>
+            <td>${o["Amount Paid"]}</td>
+            <td><span class="badge ${o.Status === "Pending" ? "pending" : "done"}">${o.Status}</span></td>
+            <td>${o.Timestamp || ""}</td>
+            <td>
+              <form method="POST" action="${TOGGLE_BASE}${o.ID}">
+                <button type="submit">${o.Status === "Pending" ? "Mark Done" : "Undo"}</button>
+              </form>
+            </td>
+          </tr>`;
       });
     }
   });
