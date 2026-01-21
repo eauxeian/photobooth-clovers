@@ -2,57 +2,66 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>🍀 Photobooth Clovers</title>
+  <title>🍀 Clovers Photobooth</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
 
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
     body {
+      margin: 0;
+      min-height: 100vh;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
       background: linear-gradient(135deg, #e8f5e9, #f1f8f4);
-      margin: 0;
-      padding: 1.2rem;
-      color: #2e2e2e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
     }
 
     .container {
-      max-width: 1000px;
-      margin: auto;
-      background: #ffffff;
-      padding: 1.6rem;
-      border-radius: 14px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+      width: 100%;
+      max-width: 420px;
+      background: #fff;
+      padding: 2rem;
+      border-radius: 18px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.12);
     }
 
     h1 {
       text-align: center;
-      margin-bottom: 1rem;
+      margin-bottom: 1.5rem;
+      font-size: 1.4rem;
     }
 
     form {
-      display: inline-block;
-      margin: 0;
-    }
-
-    .form-stack {
       display: flex;
       flex-direction: column;
       gap: 0.9rem;
-      margin-top: 1rem;
     }
 
     input {
-      padding: 0.8rem;
-      border-radius: 10px;
+      width: 100%;
+      padding: 0.85rem 1rem;
+      border-radius: 12px;
       border: 1px solid #ccc;
-      font-size: 1rem;
+      font-size: 0.95rem;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #2e7d32;
     }
 
     button {
-      padding: 0.75rem 1rem;
-      border-radius: 10px;
+      padding: 0.85rem;
+      border-radius: 14px;
       border: none;
       font-weight: 600;
+      font-size: 0.95rem;
       cursor: pointer;
       background: #2e7d32;
       color: #fff;
@@ -72,26 +81,26 @@
       background: #e0e0e0;
     }
 
-    .top-actions {
+    .actions {
       display: flex;
-      gap: 0.5rem;
+      gap: 0.6rem;
       justify-content: center;
-      margin-top: 1rem;
+      margin-top: 1.2rem;
       flex-wrap: wrap;
     }
 
+    /* TABLE PAGES */
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 1.2rem;
-      font-size: 0.95rem;
+      margin-top: 1rem;
+      font-size: 0.85rem;
     }
 
     th, td {
-      padding: 0.7rem;
+      padding: 0.6rem;
       border-bottom: 1px solid #e0e0e0;
       text-align: left;
-      vertical-align: middle;
     }
 
     th {
@@ -99,14 +108,10 @@
       font-weight: 600;
     }
 
-    tr:hover {
-      background: #fafafa;
-    }
-
     .badge {
-      padding: 0.3rem 0.6rem;
+      padding: 0.25rem 0.55rem;
       border-radius: 6px;
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       font-weight: 700;
     }
 
@@ -125,44 +130,33 @@
       margin: 0.15rem 0;
     }
 
-    @media (max-width: 700px) {
-      table {
-        font-size: 0.85rem;
-      }
+    /* WIDE PAGES (admin / queue) */
+    .wide {
+      max-width: 1000px;
     }
   </style>
 </head>
 
 <body>
-<div class="container">
+
+<div class="container {% if page in ['admin','queue'] %}wide{% endif %}">
 
 {% if page == "form" %}
   <h1>🍀 Clovers Photobooth — Order Form 📸</h1>
 
   <form method="POST" action="/submit"
         onsubmit="timestamp.value=new Date().toISOString().slice(0,19).replace('T',' ')">
-    <div class="form-stack">
-      <input name="name" placeholder="Full Name" required>
-      <input name="email" placeholder="Email (gmail.com or up.edu.ph)">
-      <input name="copies" type="number" min="1" placeholder="Copies" required>
-      <input name="amount" type="number" min="0" placeholder="Amount Paid" required>
-      <input type="hidden" name="timestamp">
-      <button type="submit">Submit Order</button>
-    </div>
+    <input name="name" placeholder="Full Name" required>
+    <input name="email" placeholder="Email (gmail.com or up.edu.ph)">
+    <input name="copies" type="number" min="1" placeholder="Copies" required>
+    <input name="amount" type="number" min="0" placeholder="Amount Paid" required>
+    <input type="hidden" name="timestamp">
+    <button type="submit">Submit Order</button>
   </form>
 
-  <div class="top-actions">
+  <div class="actions">
     <a href="/queue"><button type="button" class="btn-secondary">View Queue</button></a>
     <a href="/admin"><button type="button" class="btn-secondary">Admin</button></a>
-  </div>
-
-{% elif page == "thanks" %}
-  <h1>✅ Order Submitted!</h1>
-  <p style="text-align:center;">Your queue number: <b>#{{ position }}</b></p>
-
-  <div class="top-actions">
-    <a href="/queue"><button>View Queue</button></a>
-    <a href="/"><button class="btn-secondary">Submit Another</button></a>
   </div>
 
 {% elif page == "queue" %}
@@ -180,7 +174,7 @@
     <tbody id="queue-body"></tbody>
   </table>
 
-  <div class="top-actions">
+  <div class="actions">
     <a href="/"><button class="btn-secondary">Back</button></a>
   </div>
 
@@ -188,20 +182,14 @@
   <h1>🔑 Admin Login</h1>
 
   <form method="POST">
-    <div class="form-stack">
-      <input type="password" name="password" placeholder="Admin Password" required>
-      <button>Login</button>
-    </div>
+    <input type="password" name="password" placeholder="Admin Password" required>
+    <button>Login</button>
   </form>
-
-  {% if error %}
-    <p style="color:red; text-align:center;">{{ error }}</p>
-  {% endif %}
 
 {% elif page == "admin" %}
   <h1>🛠 Admin Dashboard</h1>
 
-  <div class="top-actions">
+  <div class="actions">
     <a href="/logout"><button class="btn-secondary">Logout</button></a>
     <a href="/queue"><button class="btn-secondary">View Queue</button></a>
   </div>
