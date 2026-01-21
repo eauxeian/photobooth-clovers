@@ -1,70 +1,217 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>🍀 Photobooth Clovers</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+  <meta charset="UTF-8">
+  <title>🍀 Photobooth Clovers</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
 
-<style>
-body { font-family: sans-serif; background:#f9f9f9; padding:1rem }
-.container { background:#fff; padding:1.5rem; border-radius:12px; max-width:1000px; margin:auto }
-table { width:100%; border-collapse:collapse; margin-top:1rem }
-th, td { border:1px solid #ddd; padding:.5rem }
-.badge.pending { background:#ffecb3; padding:.3rem .6rem; border-radius:6px }
-.badge.done { background:#4a7a44; color:#fff; padding:.3rem .6rem; border-radius:6px }
-button { padding:.4rem .7rem; margin:.1rem }
-</style>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #e8f5e9, #f1f8f4);
+      margin: 0;
+      padding: 1.2rem;
+      color: #2e2e2e;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: auto;
+      background: #ffffff;
+      padding: 1.6rem;
+      border-radius: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.9rem;
+      margin-top: 1rem;
+    }
+
+    input {
+      padding: 0.8rem;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+    }
+
+    button {
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      background: #2e7d32;
+      color: #fff;
+      transition: 0.2s ease;
+    }
+
+    button:hover {
+      background: #256428;
+    }
+
+    .btn-secondary {
+      background: #eeeeee;
+      color: #333;
+    }
+
+    .btn-secondary:hover {
+      background: #e0e0e0;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1.2rem;
+      font-size: 0.95rem;
+    }
+
+    th, td {
+      padding: 0.7rem;
+      border-bottom: 1px solid #e0e0e0;
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    th {
+      background: #f5f5f5;
+      font-weight: 600;
+    }
+
+    tr:hover {
+      background: #fafafa;
+    }
+
+    .badge {
+      padding: 0.3rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .pending {
+      background: #ffecb3;
+      color: #7a6000;
+    }
+
+    .done {
+      background: #4a7a44;
+      color: #fff;
+    }
+
+    .admin-actions form {
+      display: inline-block;
+      margin: 0.15rem 0;
+    }
+
+    @media (max-width: 700px) {
+      table {
+        font-size: 0.85rem;
+      }
+    }
+  </style>
 </head>
 
 <body>
 <div class="container">
 
 {% if page == "form" %}
-<h1>📸 Order Form</h1>
-<form method="POST" action="/submit" onsubmit="timestamp.value=new Date().toISOString().slice(0,19).replace('T',' ')">
-<input name="name" required placeholder="Name">
-<input name="email" placeholder="Email">
-<input name="copies" type="number" min="1" required>
-<input name="amount" type="number" min="0" required>
-<input type="hidden" name="timestamp">
-<button>Submit</button>
-</form>
-<a href="/queue">View Queue</a> | <a href="/admin">Admin</a>
+  <h1>🍀 Clovers Photobooth — Order Form 📸</h1>
+
+  <form method="POST" action="/submit"
+        onsubmit="timestamp.value=new Date().toISOString().slice(0,19).replace('T',' ')">
+    <input name="name" placeholder="Full Name" required>
+    <input name="email" placeholder="Email (gmail.com or up.edu.ph)">
+    <input name="copies" type="number" min="1" placeholder="Copies" required>
+    <input name="amount" type="number" min="0" placeholder="Amount Paid" required>
+    <input type="hidden" name="timestamp">
+    <button type="submit">Submit Order</button>
+  </form>
+
+  <div class="top-actions">
+    <a href="/queue"><button type="button" class="btn-secondary">View Queue</button></a>
+    <a href="/admin"><button type="button" class="btn-secondary">Admin</button></a>
+  </div>
 
 {% elif page == "thanks" %}
-<h1>✅ Submitted</h1>
-<p>Your position: <b>#{{ position }}</b></p>
-<a href="/queue">Queue</a>
+  <h1>✅ Order Submitted!</h1>
+  <p style="text-align:center;">Your queue number: <b>#{{ position }}</b></p>
+
+  <div class="top-actions">
+    <a href="/queue"><button>View Queue</button></a>
+    <a href="/"><button class="btn-secondary">Submit Another</button></a>
+  </div>
 
 {% elif page == "queue" %}
-<h1>📋 Live Queue</h1>
-<table>
-<thead><tr><th>#</th><th>Name</th><th>Copies</th><th>Amount</th></tr></thead>
-<tbody id="queue-body"></tbody>
-</table>
+  <h1>📋 Live Queue</h1>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Copies</th>
+        <th>Amount</th>
+      </tr>
+    </thead>
+    <tbody id="queue-body"></tbody>
+  </table>
+
+  <div class="top-actions">
+    <a href="/"><button class="btn-secondary">Back</button></a>
+  </div>
 
 {% elif page == "login" %}
-<h1>🔑 Admin Login</h1>
-<form method="POST">
-<input type="password" name="password">
-<button>Login</button>
-</form>
-{{ error }}
+  <h1>🔑 Admin Login</h1>
+
+  <form method="POST">
+    <input type="password" name="password" placeholder="Admin Password" required>
+    <button>Login</button>
+  </form>
+
+  {% if error %}
+    <p style="color:red; text-align:center;">{{ error }}</p>
+  {% endif %}
 
 {% elif page == "admin" %}
-<h1>🛠 Admin Dashboard</h1>
-<a href="/logout">Logout</a>
+  <h1>🛠 Admin Dashboard</h1>
 
-<table>
-<thead>
-<tr>
-<th>ID</th><th>Name</th><th>Copies</th><th>Amount</th>
-<th>Status</th><th>Printed</th><th>Claimed</th><th>Actions</th>
-</tr>
-</thead>
-<tbody id="admin-body"></tbody>
-</table>
+  <div class="top-actions">
+    <a href="/logout"><button class="btn-secondary">Logout</button></a>
+    <a href="/queue"><button class="btn-secondary">View Queue</button></a>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Copies</th>
+        <th>Amount</th>
+        <th>Status</th>
+        <th>Printed</th>
+        <th>Claimed</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="admin-body"></tbody>
+  </table>
 {% endif %}
 
 </div>
@@ -77,34 +224,49 @@ socket.on("queue_update", data => {
   if (location.pathname === "/queue") {
     const tbody = document.getElementById("queue-body");
     tbody.innerHTML = "";
-    data.pending.forEach((o,i) => {
-      tbody.innerHTML += `<tr>
-        <td>${i+1}</td>
-        <td>${o.Name}</td>
-        <td>${o.Copies}</td>
-        <td>${o["Amount Paid"]}</td>
-      </tr>`;
+
+    if (!data.pending.length) {
+      tbody.innerHTML = "<tr><td colspan='4'>No pending orders 🎉</td></tr>";
+      return;
+    }
+
+    data.pending.forEach((o, i) => {
+      tbody.innerHTML += `
+        <tr>
+          <td>${i + 1}</td>
+          <td>${o.Name}</td>
+          <td>${o.Copies}</td>
+          <td>${o["Amount Paid"]}</td>
+        </tr>`;
     });
   }
 
   if (location.pathname === "/dashboard") {
     const tbody = document.getElementById("admin-body");
     tbody.innerHTML = "";
+
     data.all.forEach(o => {
-      tbody.innerHTML += `<tr>
-        <td>${o.ID}</td>
-        <td>${o.Name}</td>
-        <td>${o.Copies}</td>
-        <td>${o["Amount Paid"]}</td>
-        <td><span class="badge ${o.Status==="Pending"?"pending":"done"}">${o.Status}</span></td>
-        <td>${o.Printed}</td>
-        <td>${o.Claimed}</td>
-        <td>
-          <form method="POST" action="/toggle/${o.ID}"><button>Done/Undo</button></form>
-          <form method="POST" action="/toggle_printed/${o.ID}"><button>Printed</button></form>
-          <form method="POST" action="/toggle_claimed/${o.ID}"><button>Claimed</button></form>
-        </td>
-      </tr>`;
+      tbody.innerHTML += `
+        <tr>
+          <td>${o.ID}</td>
+          <td>${o.Name}</td>
+          <td>${o.Copies}</td>
+          <td>${o["Amount Paid"]}</td>
+          <td><span class="badge ${o.Status === "Pending" ? "pending" : "done"}">${o.Status}</span></td>
+          <td>${o.Printed}</td>
+          <td>${o.Claimed}</td>
+          <td class="admin-actions">
+            <form method="POST" action="/toggle/${o.ID}">
+              <button>${o.Status === "Pending" ? "Mark Done" : "Undo"}</button>
+            </form>
+            <form method="POST" action="/toggle_printed/${o.ID}">
+              <button class="btn-secondary">Printed</button>
+            </form>
+            <form method="POST" action="/toggle_claimed/${o.ID}">
+              <button class="btn-secondary">Claimed</button>
+            </form>
+          </td>
+        </tr>`;
     });
   }
 });
