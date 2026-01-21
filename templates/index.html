@@ -30,6 +30,11 @@
     }
 
     form {
+      display: inline-block;
+      margin: 0;
+    }
+
+    .form-stack {
       display: flex;
       flex-direction: column;
       gap: 0.9rem;
@@ -136,12 +141,14 @@
 
   <form method="POST" action="/submit"
         onsubmit="timestamp.value=new Date().toISOString().slice(0,19).replace('T',' ')">
-    <input name="name" placeholder="Full Name" required>
-    <input name="email" placeholder="Email (gmail.com or up.edu.ph)">
-    <input name="copies" type="number" min="1" placeholder="Copies" required>
-    <input name="amount" type="number" min="0" placeholder="Amount Paid" required>
-    <input type="hidden" name="timestamp">
-    <button type="submit">Submit Order</button>
+    <div class="form-stack">
+      <input name="name" placeholder="Full Name" required>
+      <input name="email" placeholder="Email (gmail.com or up.edu.ph)">
+      <input name="copies" type="number" min="1" placeholder="Copies" required>
+      <input name="amount" type="number" min="0" placeholder="Amount Paid" required>
+      <input type="hidden" name="timestamp">
+      <button type="submit">Submit Order</button>
+    </div>
   </form>
 
   <div class="top-actions">
@@ -181,8 +188,10 @@
   <h1>🔑 Admin Login</h1>
 
   <form method="POST">
-    <input type="password" name="password" placeholder="Admin Password" required>
-    <button>Login</button>
+    <div class="form-stack">
+      <input type="password" name="password" placeholder="Admin Password" required>
+      <button>Login</button>
+    </div>
   </form>
 
   {% if error %}
@@ -265,6 +274,11 @@ socket.on("queue_update", data => {
             <form method="POST" action="/toggle_claimed/${o.ID}">
               <button class="btn-secondary">Claimed</button>
             </form>
+            ${o.Status === "Done" ? `
+            <form method="POST" action="/clear/${o.ID}">
+              <button class="btn-secondary">Clear</button>
+            </form>
+            ` : ``}
           </td>
         </tr>`;
     });

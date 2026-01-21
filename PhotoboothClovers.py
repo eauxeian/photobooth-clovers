@@ -8,38 +8,30 @@ from oauth2client.service_account import ServiceAccountCredentials
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_socketio import SocketIO
 
-# ---------------------------------------------------------
-# Flask + SocketIO Setup
-# ---------------------------------------------------------
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev_secret")
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# ---------------------------------------------------------
-# Environment Variables
-# ---------------------------------------------------------
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 GOOGLE_CREDS = os.environ.get("GOOGLE_CREDS")
 SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID")
 
 if not ADMIN_PASSWORD or not GOOGLE_CREDS or not SPREADSHEET_ID:
-    raise RuntimeError("Missing required environment variables")
+    raise RuntimeError("Missing environment variables")
 
-# ---------------------------------------------------------
-# Google Sheets Setup
-# ---------------------------------------------------------
 scope = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive",
 ]
-creds_dict = json.loads(GOOGLE_CREDS)
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+creds = ServiceAccountCredentials.from_json_keyfile_dict(
+    json.loads(GOOGLE_CREDS), scope
+)
 client = gspread.authorize(creds)
 sheet = client.open_by_key(SPREADSHEET_ID).sheet1
 
-# ---------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------
+# 🔒 Cleared IDs live ONLY in memory (not Sheets)
+CLEARED_IDS = set()
+
 def valid_email(email):
     if not email:
         return True
@@ -55,25 +47,21 @@ def get_records():
 def broadcast_queue():
     records = get_records()
 
-    pending = [r for r in records if r["Status"] == "Pending"]
+    visible = [r for r in records if r["ID"] not in CLEARED_IDS]
+
+    pending = [r for r in visible if r["Status"] == "Pending"]
     for i, r in enumerate(pending, start=1):
         r["QueueNumber"] = i
 
     socketio.emit("queue_update", {
-        "all": records,
+        "all": visible,
         "pending": pending
     })
 
-# ---------------------------------------------------------
-# Socket.IO
-# ---------------------------------------------------------
 @socketio.on("connect")
-def connect():
+def on_connect():
     broadcast_queue()
 
-# ---------------------------------------------------------
-# Routes
-# ---------------------------------------------------------
 @app.route("/")
 def form():
     return render_template("index.html", page="form")
@@ -109,9 +97,6 @@ def thanks(position):
 def queue():
     return render_template("index.html", page="queue")
 
-# ---------------------------------------------------------
-# Admin
-# ---------------------------------------------------------
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
     if request.method == "POST":
@@ -132,8 +117,7 @@ def toggle_status(order_id):
     if not session.get("is_admin"):
         return redirect(url_for("admin"))
 
-    data = get_records()
-    for i, r in enumerate(data, start=2):
+    for i, r in enumerate(get_records(), start=2):
         if r["ID"] == order_id:
             if r["Status"] == "Pending":
                 sheet.update_cell(i, 6, "Done")
@@ -173,24 +157,20 @@ def toggle_claimed(order_id):
     broadcast_queue()
     return redirect(url_for("dashboard"))
 
+# 🧹 Clear (UI only, NOT Sheets)
+@app.route("/clear/<int:order_id>", methods=["POST"])
+def clear_order(order_id):
+    if not session.get("is_admin"):
+        return redirect(url_for("admin"))
+
+    CLEARED_IDS.add(order_id)
+    broadcast_queue()
+    return redirect(url_for("dashboard"))
+
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("admin"))
 
-# ---------------------------------------------------------
-# API
-# ---------------------------------------------------------
-@app.route("/api/queue")
-def api_queue():
-    records = get_records()
-    pending = [r for r in records if r["Status"] == "Pending"]
-    for i, r in enumerate(pending, start=1):
-        r["QueueNumber"] = i
-    return jsonify(pending)
-
-# ---------------------------------------------------------
-# Run
-# ---------------------------------------------------------
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
