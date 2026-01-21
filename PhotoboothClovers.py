@@ -22,12 +22,8 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 GOOGLE_CREDS = os.environ.get("GOOGLE_CREDS")
 SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID")
 
-if not ADMIN_PASSWORD:
-    raise RuntimeError("ADMIN_PASSWORD must be set")
-if not GOOGLE_CREDS:
-    raise RuntimeError("GOOGLE_CREDS must be set")
-if not SPREADSHEET_ID:
-    raise RuntimeError("SPREADSHEET_ID must be set")
+if not ADMIN_PASSWORD or not GOOGLE_CREDS or not SPREADSHEET_ID:
+    raise RuntimeError("Missing required environment variables")
 
 # ---------------------------------------------------------
 # Google Sheets Setup
@@ -44,45 +40,35 @@ sheet = client.open_by_key(SPREADSHEET_ID).sheet1
 # ---------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------
-def valid_email(email: str) -> bool:
+def valid_email(email):
     if not email:
         return True
-    return bool(
-        re.match(r"^[^@]+@(gmail\.com|up\.edu\.ph)$", email, re.IGNORECASE)
-    )
+    return bool(re.match(r"^[^@]+@(gmail\.com|up\.edu\.ph)$", email, re.IGNORECASE))
 
-def _get_records():
-    expected_headers = [
-        "ID",
-        "Name",
-        "Email",
-        "Copies",
-        "Amount Paid",
-        "Status",
-        "Printed",
-        "Claimed",
-        "Timestamp",
+def get_records():
+    headers = [
+        "ID", "Name", "Email", "Copies", "Amount Paid",
+        "Status", "Printed", "Claimed", "Timestamp"
     ]
-    return sheet.get_all_records(expected_headers=expected_headers)
-
-def _pending_only(records):
-    return [o for o in records if o.get("Status", "").lower() == "pending"]
+    return sheet.get_all_records(expected_headers=headers)
 
 def broadcast_queue():
-    records = _get_records()
-    active_orders = _pending_only(records)
+    records = get_records()
 
-    for idx, order in enumerate(active_orders, start=1):
-        order["QueueNumber"] = idx
+    pending = [r for r in records if r["Status"] == "Pending"]
+    for i, r in enumerate(pending, start=1):
+        r["QueueNumber"] = i
 
-    socketio.emit("queue_update", active_orders)
-    return active_orders
+    socketio.emit("queue_update", {
+        "all": records,
+        "pending": pending
+    })
 
 # ---------------------------------------------------------
 # Socket.IO
 # ---------------------------------------------------------
 @socketio.on("connect")
-def on_connect():
+def connect():
     broadcast_queue()
 
 # ---------------------------------------------------------
@@ -94,44 +80,22 @@ def form():
 
 @app.route("/submit", methods=["POST"])
 def submit():
-    name = request.form.get("name", "").strip()
-    email = request.form.get("email", "").strip().lower()
-    copies = request.form.get("copies", "0")
-    amount = request.form.get("amount", "0")
-    timestamp = request.form.get("timestamp", "")
-
-    name = re.sub(r"[^a-zA-Z0-9\s]", "", name)
-    email = re.sub(r"[^a-zA-Z0-9@._-]", "", email)
+    name = re.sub(r"[^a-zA-Z0-9\s]", "", request.form.get("name", "").strip())
+    email = re.sub(r"[^a-zA-Z0-9@._-]", "", request.form.get("email", "").strip().lower())
+    copies = int(request.form.get("copies", 1))
+    amount = float(request.form.get("amount", 0))
+    timestamp = request.form.get("timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     if not valid_email(email):
-        flash("Only gmail.com or up.edu.ph emails allowed.", "error")
+        flash("Invalid email domain", "error")
         return redirect(url_for("form"))
 
-    try:
-        copies = int(copies)
-        amount = float(amount)
-        if copies < 1 or amount < 0:
-            raise ValueError
-    except ValueError:
-        flash("Invalid input.", "error")
-        return redirect(url_for("form"))
-
-    records = _get_records()
+    records = get_records()
     new_id = len(records) + 1
 
-    if not timestamp:
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
     sheet.append_row([
-        new_id,
-        name,
-        email,
-        copies,
-        amount,
-        "Pending",   # Status
-        "No",        # Printed
-        "No",        # Claimed
-        timestamp,
+        new_id, name, email, copies, amount,
+        "Pending", "No", "No", timestamp
     ])
 
     broadcast_queue()
@@ -143,8 +107,7 @@ def thanks(position):
 
 @app.route("/queue")
 def queue():
-    orders = _get_records()
-    return render_template("index.html", page="queue", orders=orders)
+    return render_template("index.html", page="queue")
 
 # ---------------------------------------------------------
 # Admin
@@ -162,26 +125,26 @@ def admin():
 def dashboard():
     if not session.get("is_admin"):
         return redirect(url_for("admin"))
-    orders = _get_records()
-    return render_template("index.html", page="admin", orders=orders)
+    return render_template("index.html", page="admin")
 
 @app.route("/toggle/<int:order_id>", methods=["POST"])
 def toggle_status(order_id):
     if not session.get("is_admin"):
         return redirect(url_for("admin"))
 
-    data = _get_records()
-    for idx, row in enumerate(data, start=2):
-        if row.get("ID") == order_id:
-            new_status = "Done" if row.get("Status") == "Pending" else "Pending"
-            sheet.update_cell(idx, 6, new_status)
-
-            if new_status == "Done":
-                sheet.update_cell(idx, 7, "Yes")  # Printed
-
-            broadcast_queue()
+    data = get_records()
+    for i, r in enumerate(data, start=2):
+        if r["ID"] == order_id:
+            if r["Status"] == "Pending":
+                sheet.update_cell(i, 6, "Done")
+                sheet.update_cell(i, 7, "Yes")
+            else:
+                sheet.update_cell(i, 6, "Pending")
+                sheet.update_cell(i, 7, "No")
+                sheet.update_cell(i, 8, "No")
             break
 
+    broadcast_queue()
     return redirect(url_for("dashboard"))
 
 @app.route("/toggle_printed/<int:order_id>", methods=["POST"])
@@ -189,13 +152,12 @@ def toggle_printed(order_id):
     if not session.get("is_admin"):
         return redirect(url_for("admin"))
 
-    data = _get_records()
-    for idx, row in enumerate(data, start=2):
-        if row.get("ID") == order_id:
-            new_val = "Yes" if row.get("Printed") != "Yes" else "No"
-            sheet.update_cell(idx, 7, new_val)
+    for i, r in enumerate(get_records(), start=2):
+        if r["ID"] == order_id:
+            sheet.update_cell(i, 7, "No" if r["Printed"] == "Yes" else "Yes")
             break
 
+    broadcast_queue()
     return redirect(url_for("dashboard"))
 
 @app.route("/toggle_claimed/<int:order_id>", methods=["POST"])
@@ -203,13 +165,12 @@ def toggle_claimed(order_id):
     if not session.get("is_admin"):
         return redirect(url_for("admin"))
 
-    data = _get_records()
-    for idx, row in enumerate(data, start=2):
-        if row.get("ID") == order_id:
-            new_val = "Yes" if row.get("Claimed") != "Yes" else "No"
-            sheet.update_cell(idx, 8, new_val)
+    for i, r in enumerate(get_records(), start=2):
+        if r["ID"] == order_id:
+            sheet.update_cell(i, 8, "No" if r["Claimed"] == "Yes" else "Yes")
             break
 
+    broadcast_queue()
     return redirect(url_for("dashboard"))
 
 @app.route("/logout")
@@ -222,17 +183,14 @@ def logout():
 # ---------------------------------------------------------
 @app.route("/api/queue")
 def api_queue():
-    active = _pending_only(_get_records())
-    for idx, o in enumerate(active, start=1):
-        o["QueueNumber"] = idx
-    return jsonify(active)
+    records = get_records()
+    pending = [r for r in records if r["Status"] == "Pending"]
+    for i, r in enumerate(pending, start=1):
+        r["QueueNumber"] = i
+    return jsonify(pending)
 
 # ---------------------------------------------------------
 # Run
 # ---------------------------------------------------------
 if __name__ == "__main__":
-    socketio.run(
-        app,
-        host="0.0.0.0",
-        port=int(os.environ.get("PORT", 5000)),
-    )
+    socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))

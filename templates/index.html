@@ -1,297 +1,113 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>🍀 Photobooth Clovers</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="https://cdn.socket.io/4.7.4/socket.io.min.js" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<title>🍀 Photobooth Clovers</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
 
-  <style>
-    body {
-      font-family: sans-serif;
-      background: #f9f9f9;
-      margin: 0;
-      padding: 1rem;
-      color: #333;
-    }
-
-    .container {
-      max-width: 95%;
-      margin: auto;
-      background: #fff;
-      padding: 1.5rem;
-      border-radius: 12px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      overflow-x: auto;
-    }
-
-    h1 { text-align: center; }
-
-    form {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    input {
-      padding: 0.8rem;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-    }
-
-    button {
-      padding: 0.8rem;
-      border: none;
-      border-radius: 8px;
-      background: #2e7d32;
-      color: #fff;
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    button:hover { background: #256428; }
-
-    .btn-secondary {
-      background: #eee;
-      color: #333;
-    }
-
-    .btn-secondary:hover { background: #ddd; }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 1rem;
-      word-break: break-word;
-    }
-
-    th, td {
-      border: 1px solid #ddd;
-      padding: 0.6rem;
-      text-align: left;
-    }
-
-    th { background: #f0f0f0; }
-
-    .badge {
-      padding: 0.2rem 0.6rem;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      font-weight: bold;
-    }
-
-    .pending {
-      background: #ffecb3;
-      color: #8a6d00;
-    }
-
-    .done {
-      background: #4a7a44;
-      color: #fff;
-    }
-
-    .top-actions {
-      margin-top: 1rem;
-      display: flex;
-      gap: 0.5rem;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-
-    @media (min-width: 768px) {
-      .container { max-width: 900px; }
-    }
-  </style>
+<style>
+body { font-family: sans-serif; background:#f9f9f9; padding:1rem }
+.container { background:#fff; padding:1.5rem; border-radius:12px; max-width:1000px; margin:auto }
+table { width:100%; border-collapse:collapse; margin-top:1rem }
+th, td { border:1px solid #ddd; padding:.5rem }
+.badge.pending { background:#ffecb3; padding:.3rem .6rem; border-radius:6px }
+.badge.done { background:#4a7a44; color:#fff; padding:.3rem .6rem; border-radius:6px }
+button { padding:.4rem .7rem; margin:.1rem }
+</style>
 </head>
 
 <body>
 <div class="container">
 
 {% if page == "form" %}
-  <h1>🍀 Clovers Photobooth 📸 — Order Form</h1>
-
-  <form method="POST" action="{{ url_for('submit') }}" onsubmit="return validateForm(this)">
-    <input type="text" name="name" placeholder="Full Name" required>
-    <input type="email" name="email" placeholder="Email (gmail.com or up.edu.ph only)">
-    <input type="number" name="copies" placeholder="Number of Copies" min="1" required>
-    <input type="number" name="amount" placeholder="Amount Paid" min="0" required>
-    <input type="hidden" name="timestamp" id="timestamp">
-    <button type="submit">Submit Order</button>
-  </form>
-
-  <div class="top-actions">
-    <a href="{{ url_for('queue') }}"><button type="button" class="btn-secondary">View Queue</button></a>
-    <a href="{{ url_for('admin') }}"><button type="button" class="btn-secondary">Admin</button></a>
-  </div>
+<h1>📸 Order Form</h1>
+<form method="POST" action="/submit" onsubmit="timestamp.value=new Date().toISOString().slice(0,19).replace('T',' ')">
+<input name="name" required placeholder="Name">
+<input name="email" placeholder="Email">
+<input name="copies" type="number" min="1" required>
+<input name="amount" type="number" min="0" required>
+<input type="hidden" name="timestamp">
+<button>Submit</button>
+</form>
+<a href="/queue">View Queue</a> | <a href="/admin">Admin</a>
 
 {% elif page == "thanks" %}
-  <h1>✅ Order Submitted!</h1>
-  <p style="text-align:center;">Your queue number: <b>#{{ position }}</b></p>
-
-  <div class="top-actions">
-    <a href="{{ url_for('queue') }}"><button type="button">View Queue</button></a>
-    <a href="{{ url_for('form') }}"><button type="button" class="btn-secondary">Submit Another</button></a>
-  </div>
+<h1>✅ Submitted</h1>
+<p>Your position: <b>#{{ position }}</b></p>
+<a href="/queue">Queue</a>
 
 {% elif page == "queue" %}
-  <h1>📋 Live Queue</h1>
-
-  <table>
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Name</th>
-        <th>Copies</th>
-        <th>Amount</th>
-      </tr>
-    </thead>
-    <tbody id="queue-body">
-      {% set pending = orders | selectattr("Status", "equalto", "Pending") | list %}
-      {% for r in pending %}
-        <tr>
-          <td>{{ loop.index }}</td>
-          <td>{{ r["Name"] }}</td>
-          <td>{{ r["Copies"] }}</td>
-          <td>{{ r["Amount Paid"] }}</td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-
-  <div class="top-actions">
-    <a href="{{ url_for('form') }}"><button type="button" class="btn-secondary">Back</button></a>
-  </div>
+<h1>📋 Live Queue</h1>
+<table>
+<thead><tr><th>#</th><th>Name</th><th>Copies</th><th>Amount</th></tr></thead>
+<tbody id="queue-body"></tbody>
+</table>
 
 {% elif page == "login" %}
-  <h1>🔑 Admin Login</h1>
-
-  <form method="POST">
-    <input type="password" name="password" placeholder="Admin Password" required>
-    <button type="submit">Login</button>
-  </form>
-
-  {% if error %}
-    <p style="color:red; text-align:center;">{{ error }}</p>
-  {% endif %}
+<h1>🔑 Admin Login</h1>
+<form method="POST">
+<input type="password" name="password">
+<button>Login</button>
+</form>
+{{ error }}
 
 {% elif page == "admin" %}
-  <h1>🛠 Admin Dashboard</h1>
+<h1>🛠 Admin Dashboard</h1>
+<a href="/logout">Logout</a>
 
-  <div class="top-actions">
-    <a href="{{ url_for('logout') }}"><button type="button" class="btn-secondary">Logout</button></a>
-    <a href="{{ url_for('queue') }}"><button type="button" class="btn-secondary">View Queue</button></a>
-  </div>
-
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Name</th>
-        <th>Email</th>
-        <th>Copies</th>
-        <th>Amount</th>
-        <th>Status</th>
-        <th>Timestamp</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody id="admin-body">
-      {% for r in orders %}
-      <tr>
-        <td>{{ r["ID"] }}</td>
-        <td>{{ r["Name"] }}</td>
-        <td>{{ r["Email"] }}</td>
-        <td>{{ r["Copies"] }}</td>
-        <td>{{ r["Amount Paid"] }}</td>
-        <td>
-          <span class="badge {{ 'pending' if r['Status']=='Pending' else 'done' }}">
-            {{ r["Status"] }}
-          </span>
-        </td>
-        <td>{{ r["Timestamp"] }}</td>
-        <td>
-          <form method="POST" action="{{ url_for('toggle_status', order_id=r['ID']) }}">
-            <button type="submit">
-              {{ "Mark Done" if r["Status"] == "Pending" else "Undo" }}
-            </button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<table>
+<thead>
+<tr>
+<th>ID</th><th>Name</th><th>Copies</th><th>Amount</th>
+<th>Status</th><th>Printed</th><th>Claimed</th><th>Actions</th>
+</tr>
+</thead>
+<tbody id="admin-body"></tbody>
+</table>
 {% endif %}
 
 </div>
 
 <script>
-  const socket = io();
-  const TOGGLE_BASE = "{{ url_for('toggle_status', order_id=0) }}".replace("0", "");
+const socket = io();
 
-  function validateForm(form) {
-    const email = form.email.value.trim();
-    if (email && !(email.endsWith("@gmail.com") || email.endsWith("@up.edu.ph"))) {
-      alert("Only gmail.com or up.edu.ph emails allowed.");
-      return false;
-    }
+socket.on("queue_update", data => {
 
-    const now = new Date();
-    document.getElementById("timestamp").value =
-      now.getFullYear() + "-" +
-      String(now.getMonth()+1).padStart(2,"0") + "-" +
-      String(now.getDate()).padStart(2,"0") + " " +
-      String(now.getHours()).padStart(2,"0") + ":" +
-      String(now.getMinutes()).padStart(2,"0") + ":" +
-      String(now.getSeconds()).padStart(2,"0");
-
-    return true;
+  if (location.pathname === "/queue") {
+    const tbody = document.getElementById("queue-body");
+    tbody.innerHTML = "";
+    data.pending.forEach((o,i) => {
+      tbody.innerHTML += `<tr>
+        <td>${i+1}</td>
+        <td>${o.Name}</td>
+        <td>${o.Copies}</td>
+        <td>${o["Amount Paid"]}</td>
+      </tr>`;
+    });
   }
 
-  socket.on("queue_update", queue => {
-    if (window.location.pathname === "/queue") {
-      const tbody = document.getElementById("queue-body");
-      tbody.innerHTML = "";
-
-      const pending = queue.filter(o => o.Status === "Pending");
-      if (!pending.length) {
-        tbody.innerHTML = "<tr><td colspan='4'>No pending orders 🎉</td></tr>";
-        return;
-      }
-
-      pending.forEach((o, i) => {
-        tbody.innerHTML += `
-          <tr>
-            <td>${i + 1}</td>
-            <td>${o.Name}</td>
-            <td>${o.Copies}</td>
-            <td>${o["Amount Paid"]}</td>
-          </tr>`;
-      });
-    }
-
-    if (window.location.pathname === "/dashboard") {
-      const tbody = document.getElementById("admin-body");
-      tbody.innerHTML = "";
-
-      queue.forEach(o => {
-        tbody.innerHTML += `
-          <tr>
-            <td>${o.ID}</td>
-            <td>${o.Name}</td>
-            <td>${o.Email}</td>
-            <td>${o.Copies}</td>
-            <td>${o["Amount Paid"]}</td>
-            <td><span class="badge ${o.Status === "Pending" ? "pending" : "done"}">${o.Status}</span></td>
-            <td>${o.Timestamp || ""}</td>
-            <td>
-              <form method="POST" action="${TOGGLE_BASE}${o.ID}">
-                <button type="submit">${o.Status === "Pending" ? "Mark Done" : "Undo"}</button>
-              </form>
-            </td>
-          </tr>`;
-      });
-    }
-  });
+  if (location.pathname === "/dashboard") {
+    const tbody = document.getElementById("admin-body");
+    tbody.innerHTML = "";
+    data.all.forEach(o => {
+      tbody.innerHTML += `<tr>
+        <td>${o.ID}</td>
+        <td>${o.Name}</td>
+        <td>${o.Copies}</td>
+        <td>${o["Amount Paid"]}</td>
+        <td><span class="badge ${o.Status==="Pending"?"pending":"done"}">${o.Status}</span></td>
+        <td>${o.Printed}</td>
+        <td>${o.Claimed}</td>
+        <td>
+          <form method="POST" action="/toggle/${o.ID}"><button>Done/Undo</button></form>
+          <form method="POST" action="/toggle_printed/${o.ID}"><button>Printed</button></form>
+          <form method="POST" action="/toggle_claimed/${o.ID}"><button>Claimed</button></form>
+        </td>
+      </tr>`;
+    });
+  }
+});
 </script>
 
 </body>
