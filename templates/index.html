@@ -7,9 +7,7 @@
   <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -68,18 +66,14 @@
       transition: 0.2s ease;
     }
 
-    button:hover {
-      background: #256428;
-    }
+    button:hover { background: #256428; }
 
     .btn-secondary {
       background: #eeeeee;
       color: #333;
     }
 
-    .btn-secondary:hover {
-      background: #e0e0e0;
-    }
+    .btn-secondary:hover { background: #e0e0e0; }
 
     .actions {
       display: flex;
@@ -89,7 +83,6 @@
       flex-wrap: wrap;
     }
 
-    /* TABLE PAGES */
     table {
       width: 100%;
       border-collapse: collapse;
@@ -130,10 +123,7 @@
       margin: 0.15rem 0;
     }
 
-    /* WIDE PAGES (admin / queue) */
-    .wide {
-      max-width: 1000px;
-    }
+    .wide { max-width: 1000px; }
   </style>
 </head>
 
@@ -157,6 +147,25 @@
   <div class="actions">
     <a href="/queue"><button type="button" class="btn-secondary">View Queue</button></a>
     <a href="/admin"><button type="button" class="btn-secondary">Admin</button></a>
+  </div>
+
+{% elif page == "thanks" %}
+  <h1>✅ Order Submitted!</h1>
+
+  <p style="text-align:center;">Thank you for your order 📸🍀</p>
+
+  <div style="
+    text-align:center;
+    font-size:2.5rem;
+    font-weight:700;
+    margin:1.2rem 0;
+    color:#2e7d32;">
+    {{ position }}
+  </div>
+
+  <div class="actions">
+    <a href="/queue"><button class="btn-secondary">View Queue</button></a>
+    <a href="/"><button class="btn-secondary">New Order</button></a>
   </div>
 
 {% elif page == "queue" %}
