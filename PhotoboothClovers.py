@@ -3,6 +3,7 @@ import json
 import re
 from datetime import datetime
 
+import random
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
@@ -31,6 +32,15 @@ sheet = client.open_by_key(SPREADSHEET_ID).sheet1
 
 # 🔒 Cleared IDs live ONLY in memory (not Sheets)
 CLEARED_IDS = set()
+
+def generate_unique_id():
+    records = get_records()
+    existing_ids = {int(r["ID"]) for r in records}
+
+    while True:
+        new_id = random.randint(100, 9999)
+        if new_id not in existing_ids:
+            return new_id
 
 def valid_email(email):
     if not email:
@@ -91,8 +101,7 @@ def submit():
         flash("Invalid email domain", "error")
         return redirect(url_for("form"))
 
-    records = get_records()
-    new_id = len(records) + 1
+    new_id = generate_unique_id()
 
     sheet.append_row([
         new_id, name, email, copies, amount,
