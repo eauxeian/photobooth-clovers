@@ -42,14 +42,27 @@ def get_records():
         "ID", "Name", "Email", "Copies", "Amount Paid",
         "Status", "Printed", "Claimed", "Timestamp"
     ]
-    return sheet.get_all_records(expected_headers=headers)
+    records = sheet.get_all_records(expected_headers=headers)
+
+    # Normalize data
+    for r in records:
+        r["ID"] = int(r["ID"])
+        r["Status"] = str(r["Status"]).strip()
+        r["Printed"] = str(r["Printed"]).strip()
+        r["Claimed"] = str(r["Claimed"]).strip()
+
+    return records
 
 def broadcast_queue():
     records = get_records()
 
-    visible = [r for r in records if r["ID"] not in CLEARED_IDS]
+    visible = [r for r in records if int(r["ID"]) not in CLEARED_IDS]
 
-    pending = [r for r in visible if r["Status"] == "Pending"]
+    pending = [
+        r for r in visible
+        if str(r["Status"]).strip().lower() == "pending"
+    ]
+
     for i, r in enumerate(pending, start=1):
         r["QueueNumber"] = i
 
