@@ -87,9 +87,9 @@ socket.on("connect", function () {
 
 // GREEN CONFETTI ON THANK YOU PAGE
 document.addEventListener("DOMContentLoaded", function () {
-    const isThanksPage = document.querySelector("h3");
+    const successPage = document.getElementById("success-page");
 
-    if (isThanksPage) {
+    if (successPage) {
         const duration = 2000;
         const end = Date.now() + duration;
 
@@ -97,17 +97,17 @@ document.addEventListener("DOMContentLoaded", function () {
 
         (function frame() {
             confetti({
-                particleCount: 4,
+                particleCount: 5,
                 angle: 60,
-                spread: 55,
+                spread: 60,
                 origin: { x: 0 },
                 colors: colors
             });
 
             confetti({
-                particleCount: 4,
+                particleCount: 5,
                 angle: 120,
-                spread: 55,
+                spread: 60,
                 origin: { x: 1 },
                 colors: colors
             });
@@ -118,6 +118,7 @@ document.addEventListener("DOMContentLoaded", function () {
         })();
     }
 });
+
 
 function addItem() {
     const container = document.getElementById("items-container");
@@ -134,7 +135,20 @@ function addItem() {
         </select>
 
         <input type="number" name="quantity[]" min="1" placeholder="Qty" required>
+
+        <button type="button" class="remove-btn" onclick="removeItem(this)">✕</button>
     `;
 
     container.appendChild(div);
 }
+
+function removeItem(button) {
+    const container = document.getElementById("items-container");
+
+    if (container.children.length > 1) {
+        button.parentElement.remove();
+    } else {
+        alert("At least one item is required.");
+    }
+}
+

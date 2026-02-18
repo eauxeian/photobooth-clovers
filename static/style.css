@@ -166,4 +166,25 @@ button:hover {
     margin-bottom: 15px;
 }
 
+.order-item {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    align-items: center;
+}
+
+.remove-btn {
+    background: #fdecea;
+    border: none;
+    color: #b02a37;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.remove-btn:hover {
+    background: #b02a37;
+    color: white;
+}
 
