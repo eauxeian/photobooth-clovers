@@ -98,6 +98,28 @@ input:focus, select:focus {
     box-shadow: 0 0 0 3px rgba(39,174,96,0.15);
 }
 
+.order-item {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.order-item select,
+.order-item input {
+    flex: 1;
+}
+
+button[type="button"] {
+    margin-top: 10px;
+    background: #eafaf1;
+    color: #27ae60;
+    border: 1px solid #27ae60;
+}
+
+button[type="button"]:hover {
+    background: #27ae60;
+    color: white;
+}
 /* BUTTON */
 button {
     margin-top: 25px;
@@ -144,25 +166,4 @@ button:hover {
     margin-bottom: 15px;
 }
 
-.order-item {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 10px;
-}
 
-.order-item select,
-.order-item input {
-    flex: 1;
-}
-
-button[type="button"] {
-    margin-top: 10px;
-    background: #eafaf1;
-    color: #27ae60;
-    border: 1px solid #27ae60;
-}
-
-button[type="button"]:hover {
-    background: #27ae60;
-    color: white;
-}
