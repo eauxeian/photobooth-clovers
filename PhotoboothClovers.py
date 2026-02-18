@@ -208,20 +208,19 @@ def dashboard():
 
 
 @app.route("/toggle/<int:order_id>", methods=["POST"])
-def toggle_status(order_id):
-    if not session.get("is_admin"):
-        return redirect(url_for("admin"))
+def toggle_status(group_id):
+    values = sheet.get_all_values()
 
-    for i, r in enumerate(get_records(), start=2):
-        if r["ID"] == order_id:
-            if r["Status"] == "Pending":
-                sheet.update_cell(i, 8, "Done")
-                sheet.update_cell(i, 9, "Yes")
-            else:
-                sheet.update_cell(i, 8, "Pending")
-                sheet.update_cell(i, 9, "No")
-                sheet.update_cell(i, 10, "No")
-            break
+    updates = []
+
+    for i in range(1, len(values)):
+        if values[i][0] == str(group_id):  # 0 = Group ID column
+            current_status = values[i][7]  # 7 = Status column
+            new_status = "Done" if current_status == "Pending" else "Pending"
+            updates.append((i + 1, new_status))
+
+    for row_number, status in updates:
+        sheet.update_cell(row_number, 8, status)
 
     broadcast_queue()
     return redirect(url_for("dashboard"))
