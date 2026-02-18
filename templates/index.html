@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Photobooth Clovers</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -20,29 +20,28 @@
 
 <div class="container">
 
+{% if page == "form" %}
+
     <h2>Place an Order</h2>
 
-    <div class="products">
-        <div class="product">
-            <img src="{{ url_for('static', filename='images/stickers.jpg') }}" alt="Stickers">
-            <p>Stickers</p>
-        </div>
-
-        <div class="product">
-            <img src="{{ url_for('static', filename='images/bracelet.jpg') }}" alt="Charm Bracelet">
-            <p>Charm Bracelet</p>
-        </div>
-
-        <div class="product">
-            <img src="{{ url_for('static', filename='images/photobooth.jpg') }}" alt="Photo Booth">
-            <p>Photo Booth</p>
-        </div>
-    </div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
 
     <form action="/submit" method="POST">
 
+        <label>Name</label>
+        <input type="text" name="name" required>
+
+        <label>Email (gmail or up.edu.ph only)</label>
+        <input type="email" name="email">
+
         <label>Facebook Profile Link</label>
-        <input type="text" name="facebook" placeholder="https://facebook.com/yourname" required>
+        <input type="text" name="facebook" placeholder="https://facebook.com/yourname">
 
         <label>Order Type</label>
         <select name="order_type" required>
@@ -55,12 +54,55 @@
         <label>Quantity</label>
         <input type="number" name="quantity" min="1" required>
 
+        <label>Amount Paid</label>
+        <input type="number" name="amount" step="0.01" required>
+
         <button type="submit">Submit Order</button>
 
     </form>
 
+{% elif page == "thanks" %}
+
+    <h2>Thank You!</h2>
+    <p>Your Order ID:</p>
+    <h3>{{ position }}</h3>
+    <a href="/queue">View Live Queue</a>
+
+{% elif page == "queue" %}
+
+    <h2>Live Queue</h2>
+    <div id="queue-container">
+        <p>Loading queue...</p>
+    </div>
+
+{% elif page == "login" %}
+
+    <h2>Admin Login</h2>
+
+    {% if error %}
+        <div class="flash error">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST">
+        <label>Password</label>
+        <input type="password" name="password" required>
+        <button type="submit">Login</button>
+    </form>
+
+{% elif page == "admin" %}
+
+    <h2>Admin Dashboard</h2>
+    <div id="admin-dashboard">
+        <p>Loading dashboard...</p>
+    </div>
+    <a href="/logout">Logout</a>
+
+{% endif %}
+
 </div>
 
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script src="{{ url_for('static', filename='script.js') }}"></script>
+
 </body>
 </html>
