@@ -84,3 +84,37 @@ socket.on("queue_update", function (data) {
 socket.on("connect", function () {
     console.log("Connected to server");
 });
+
+// GREEN CONFETTI ON THANK YOU PAGE
+document.addEventListener("DOMContentLoaded", function () {
+    const isThanksPage = document.querySelector("h3");
+
+    if (isThanksPage) {
+        const duration = 2000;
+        const end = Date.now() + duration;
+
+        const colors = ["#27ae60", "#2ecc71", "#a3e4c7"];
+
+        (function frame() {
+            confetti({
+                particleCount: 4,
+                angle: 60,
+                spread: 55,
+                origin: { x: 0 },
+                colors: colors
+            });
+
+            confetti({
+                particleCount: 4,
+                angle: 120,
+                spread: 55,
+                origin: { x: 1 },
+                colors: colors
+            });
+
+            if (Date.now() < end) {
+                requestAnimationFrame(frame);
+            }
+        })();
+    }
+});

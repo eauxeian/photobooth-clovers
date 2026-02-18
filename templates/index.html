@@ -2,15 +2,25 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Photobooth Clovers</title>
+    <title>Clovers X Sneak Attack</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 
-<header>
-    Photobooth Clovers
+<header class="brand-header">
+    <div class="brand-container">
+        <img src="{{ url_for('static', filename='images/sneakattack.jpg') }}" class="brand-logo">
+        <div class="brand-text">
+            <h1>Clovers X Sneak Attack</h1>
+        </div>
+    </div>
 </header>
+
 
 <nav class="topnav">
     <a href="/">Order</a>
@@ -57,6 +67,11 @@
         <label>Amount Paid</label>
         <input type="number" name="amount" step="0.01" required>
 
+        <label class="checkbox-container">
+          <input type="checkbox" name="liked_page" required>
+           I have liked the Sneak Attack Facebook page
+        </label>
+
         <button type="submit">Submit Order</button>
 
     </form>
@@ -102,6 +117,7 @@
 </div>
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 <script src="{{ url_for('static', filename='script.js') }}"></script>
 
 </body>

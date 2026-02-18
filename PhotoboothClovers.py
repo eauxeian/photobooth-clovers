@@ -64,7 +64,7 @@ def get_records():
 
     headers = [
         "ID", "Name", "Email", "Facebook", "Order Type", "Quantity",
-        "Amount Paid", "Status", "Printed", "Claimed", "Timestamp", "Hidden"
+        "Amount Paid", "Status", "Printed", "Claimed", "Timestamp", "Hidden", "Liked Page"
     ]
 
     now = time.time()
@@ -134,6 +134,12 @@ def submit():
 
     timestamp = request.form.get("timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+    liked_page = "Yes" if request.form.get("liked_page") else "No"
+
+    if liked_page == "No":
+        flash("You must like the Sneak Attack Facebook page first.", "error")
+        return redirect(url_for("form"))
+
     if not valid_email(email):
         flash("Invalid email domain", "error")
         return redirect(url_for("form"))
@@ -150,7 +156,7 @@ def submit():
 
     sheet.append_row([
         new_id, name, email, facebook, order_type, quantity,
-        amount, "Pending", "No", "No", timestamp, "No"
+        amount, "Pending", "No", "No", timestamp, "No", liked_page
     ])
 
     broadcast_queue()
