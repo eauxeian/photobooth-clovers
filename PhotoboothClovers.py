@@ -207,23 +207,24 @@ def dashboard():
     return render_template("index.html", page="admin")
 
 
-@app.route("/toggle/<int:order_id>", methods=["POST"])
+@app.route("/toggle/<int:group_id>", methods=["POST"])
 def toggle_status(group_id):
     values = sheet.get_all_values()
-
     updates = []
 
     for i in range(1, len(values)):
-        if values[i][0] == str(group_id):  # 0 = Group ID column
-            current_status = values[i][7]  # 7 = Status column
+        if str(values[i][0]) == str(group_id):
+            current_status = values[i][7]
             new_status = "Done" if current_status == "Pending" else "Pending"
             updates.append((i + 1, new_status))
 
     for row_number, status in updates:
         sheet.update_cell(row_number, 8, status)
 
+    clear_cache()  # 🔥 IMPORTANT
     broadcast_queue()
     return redirect(url_for("dashboard"))
+
 
 
 @app.route("/toggle_printed/<int:order_id>", methods=["POST"])
@@ -273,6 +274,9 @@ def logout():
     session.clear()
     return redirect(url_for("admin"))
 
+def clear_cache():
+    global CACHE
+    CACHE = {"data": None, "time": 0}
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
