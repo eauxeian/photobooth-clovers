@@ -204,8 +204,17 @@ def admin():
 def dashboard():
     if not session.get("is_admin"):
         return redirect(url_for("admin"))
-    return render_template("index.html", page="admin")
 
+    clear_cache()  # ensure fresh read
+    records = get_records()
+
+    visible = [r for r in records if r.get("Hidden", "No") != "Yes"]
+
+    return render_template(
+        "index.html",
+        page="admin",
+        records=visible
+    )
 
 @app.route("/toggle/<int:group_id>", methods=["POST"])
 def toggle_status(group_id):
@@ -236,7 +245,7 @@ def toggle_printed(order_id):
         if r["ID"] == order_id:
             sheet.update_cell(i, 9, "No" if r["Printed"] == "Yes" else "Yes")
             break
-
+    clear_cache()
     broadcast_queue()
     return redirect(url_for("dashboard"))
 
@@ -250,7 +259,7 @@ def toggle_claimed(order_id):
         if r["ID"] == order_id:
             sheet.update_cell(i, 10, "No" if r["Claimed"] == "Yes" else "Yes")
             break
-
+    clear_cache()
     broadcast_queue()
     return redirect(url_for("dashboard"))
 
