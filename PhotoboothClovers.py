@@ -1,12 +1,12 @@
 import os
 import json
 import re
+import time
 from datetime import datetime
 
-import random
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_socketio import SocketIO
 
 app = Flask(__name__)
@@ -24,54 +24,80 @@ scope = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive",
 ]
+
 creds = ServiceAccountCredentials.from_json_keyfile_dict(
     json.loads(GOOGLE_CREDS), scope
 )
 client = gspread.authorize(creds)
 sheet = client.open_by_key(SPREADSHEET_ID).sheet1
 
-# 🔒 Cleared IDs live ONLY in memory (not Sheets)
-CLEARED_IDS = set()
 
-def generate_unique_id():
-    records = get_records()
-    existing_ids = {int(r["ID"]) for r in records}
+# ===============================
+# HELPERS
+# ===============================
 
-    while True:
-        new_id = random.randint(100, 9999)
-        if new_id not in existing_ids:
-            return new_id
+CACHE = {"data": None, "time": 0}
+
 
 def valid_email(email):
     if not email:
         return True
-    return bool(re.match(r"^[^@]+@(gmail\.com|up\.edu\.ph)$", email, re.IGNORECASE))
+    return bool(
+        re.fullmatch(r"[A-Za-z0-9._%+-]+@(gmail\.com|up\.edu\.ph)", email)
+    )
+
+
+def valid_facebook(link):
+    if not link:
+        return True
+    return bool(
+        re.fullmatch(r"https?://(www\.)?facebook\.com/.+", link, re.IGNORECASE)
+    )
+
+
+def valid_order_type(order_type):
+    return order_type in ["Stickers", "Charm Bracelet", "Photo Booth"]
+
 
 def get_records():
+    global CACHE
+
     headers = [
-        "ID", "Name", "Email", "Copies", "Amount Paid",
-        "Status", "Printed", "Claimed", "Timestamp"
+        "ID", "Name", "Email", "Facebook", "Order Type", "Quantity",
+        "Amount Paid", "Status", "Printed", "Claimed", "Timestamp", "Hidden"
     ]
+
+    now = time.time()
+
+    # 2-second cache
+    if CACHE["data"] and now - CACHE["time"] < 2:
+        return CACHE["data"]
+
     records = sheet.get_all_records(expected_headers=headers)
 
-    # Normalize data
     for r in records:
         r["ID"] = int(r["ID"])
         r["Status"] = str(r["Status"]).strip()
         r["Printed"] = str(r["Printed"]).strip()
         r["Claimed"] = str(r["Claimed"]).strip()
+        r["Hidden"] = str(r.get("Hidden", "No")).strip()
 
+    CACHE = {"data": records, "time": now}
     return records
+
 
 def broadcast_queue():
     records = get_records()
 
-    visible = [r for r in records if int(r["ID"]) not in CLEARED_IDS]
+    visible = [r for r in records if r.get("Hidden", "No") != "Yes"]
 
     pending = [
         r for r in visible
-        if str(r["Status"]).strip().lower() == "pending"
+        if r["Status"].lower() == "pending"
     ]
+
+    # Sort by timestamp
+    pending.sort(key=lambda r: r["Timestamp"])
 
     for i, r in enumerate(pending, start=1):
         r["QueueNumber"] = i
@@ -81,43 +107,65 @@ def broadcast_queue():
         "pending": pending
     })
 
+
 @socketio.on("connect")
 def on_connect():
     broadcast_queue()
+
+
+# ===============================
+# ROUTES
+# ===============================
 
 @app.route("/")
 def form():
     return render_template("index.html", page="form")
 
+
 @app.route("/submit", methods=["POST"])
 def submit():
     name = re.sub(r"[^a-zA-Z0-9\s]", "", request.form.get("name", "").strip())
-    email = re.sub(r"[^a-zA-Z0-9@._-]", "", request.form.get("email", "").strip().lower())
-    copies = int(request.form.get("copies", 1))
+
+    email = request.form.get("email", "").strip().lower()
+    facebook = request.form.get("facebook", "").strip()
+    order_type = request.form.get("order_type", "")
+    quantity = int(request.form.get("quantity", 1))
     amount = float(request.form.get("amount", 0))
+
     timestamp = request.form.get("timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     if not valid_email(email):
         flash("Invalid email domain", "error")
         return redirect(url_for("form"))
 
-    new_id = generate_unique_id()
+    if not valid_facebook(facebook):
+        flash("Invalid Facebook link", "error")
+        return redirect(url_for("form"))
+
+    if not valid_order_type(order_type):
+        flash("Invalid order type", "error")
+        return redirect(url_for("form"))
+
+    new_id = int(datetime.now().timestamp() * 1000)
 
     sheet.append_row([
-        new_id, name, email, copies, amount,
-        "Pending", "No", "No", timestamp
+        new_id, name, email, facebook, order_type, quantity,
+        amount, "Pending", "No", "No", timestamp, "No"
     ])
 
     broadcast_queue()
     return redirect(url_for("thanks", position=new_id))
 
+
 @app.route("/thanks/<int:position>")
 def thanks(position):
     return render_template("index.html", page="thanks", position=position)
 
+
 @app.route("/queue")
 def queue():
     return render_template("index.html", page="queue")
+
 
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
@@ -128,11 +176,13 @@ def admin():
         return render_template("index.html", page="login", error="Wrong password")
     return render_template("index.html", page="login")
 
+
 @app.route("/dashboard")
 def dashboard():
     if not session.get("is_admin"):
         return redirect(url_for("admin"))
     return render_template("index.html", page="admin")
+
 
 @app.route("/toggle/<int:order_id>", methods=["POST"])
 def toggle_status(order_id):
@@ -142,16 +192,17 @@ def toggle_status(order_id):
     for i, r in enumerate(get_records(), start=2):
         if r["ID"] == order_id:
             if r["Status"] == "Pending":
-                sheet.update_cell(i, 6, "Done")
-                sheet.update_cell(i, 7, "Yes")
+                sheet.update_cell(i, 8, "Done")
+                sheet.update_cell(i, 9, "Yes")
             else:
-                sheet.update_cell(i, 6, "Pending")
-                sheet.update_cell(i, 7, "No")
-                sheet.update_cell(i, 8, "No")
+                sheet.update_cell(i, 8, "Pending")
+                sheet.update_cell(i, 9, "No")
+                sheet.update_cell(i, 10, "No")
             break
 
     broadcast_queue()
     return redirect(url_for("dashboard"))
+
 
 @app.route("/toggle_printed/<int:order_id>", methods=["POST"])
 def toggle_printed(order_id):
@@ -160,11 +211,12 @@ def toggle_printed(order_id):
 
     for i, r in enumerate(get_records(), start=2):
         if r["ID"] == order_id:
-            sheet.update_cell(i, 7, "No" if r["Printed"] == "Yes" else "Yes")
+            sheet.update_cell(i, 9, "No" if r["Printed"] == "Yes" else "Yes")
             break
 
     broadcast_queue()
     return redirect(url_for("dashboard"))
+
 
 @app.route("/toggle_claimed/<int:order_id>", methods=["POST"])
 def toggle_claimed(order_id):
@@ -173,26 +225,32 @@ def toggle_claimed(order_id):
 
     for i, r in enumerate(get_records(), start=2):
         if r["ID"] == order_id:
-            sheet.update_cell(i, 8, "No" if r["Claimed"] == "Yes" else "Yes")
+            sheet.update_cell(i, 10, "No" if r["Claimed"] == "Yes" else "Yes")
             break
 
     broadcast_queue()
     return redirect(url_for("dashboard"))
 
-# 🧹 Clear (UI only, NOT Sheets)
+
 @app.route("/clear/<int:order_id>", methods=["POST"])
 def clear_order(order_id):
     if not session.get("is_admin"):
         return redirect(url_for("admin"))
 
-    CLEARED_IDS.add(order_id)
+    for i, r in enumerate(get_records(), start=2):
+        if r["ID"] == order_id:
+            sheet.update_cell(i, 12, "Yes")
+            break
+
     broadcast_queue()
     return redirect(url_for("dashboard"))
+
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("admin"))
+
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
