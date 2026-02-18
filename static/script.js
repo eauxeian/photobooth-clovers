@@ -118,3 +118,23 @@ document.addEventListener("DOMContentLoaded", function () {
         })();
     }
 });
+
+function addItem() {
+    const container = document.getElementById("items-container");
+
+    const div = document.createElement("div");
+    div.className = "order-item";
+
+    div.innerHTML = `
+        <select name="order_type[]" required>
+            <option value="">Select item</option>
+            <option value="Stickers">Stickers</option>
+            <option value="Charm Bracelet">Charm Bracelet</option>
+            <option value="Photo Booth">Photo Booth</option>
+        </select>
+
+        <input type="number" name="quantity[]" min="1" placeholder="Qty" required>
+    `;
+
+    container.appendChild(div);
+}

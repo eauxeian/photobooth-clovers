@@ -128,8 +128,8 @@ def submit():
 
     email = request.form.get("email", "").strip().lower()
     facebook = request.form.get("facebook", "").strip()
-    order_type = request.form.get("order_type", "")
-    quantity = int(request.form.get("quantity", 1))
+    order_types = request.form.getlist("order_type[]")
+    quantities = request.form.getlist("quantity[]")
     amount = float(request.form.get("amount", 0))
 
     timestamp = request.form.get("timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -154,10 +154,24 @@ def submit():
 
     new_id = int(datetime.now().timestamp() * 1000)
 
-    sheet.append_row([
-        new_id, name, email, facebook, order_type, quantity,
-        amount, "Pending", "No", "No", timestamp, "No", liked_page
-    ])
+    group_id = int(datetime.now().timestamp() * 1000)
+
+    for order_type, qty in zip(order_types, quantities):
+        sheet.append_row([
+            group_id,
+            name,
+            email,
+            facebook,
+            order_type,
+            int(qty),
+            amount,
+            "Pending",
+            "No",
+            "No",
+            timestamp,
+            "No",
+            liked_page
+        ])
 
     broadcast_queue()
     return redirect(url_for("thanks", position=new_id))

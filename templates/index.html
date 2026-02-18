@@ -54,15 +54,8 @@
         <input type="text" name="facebook" placeholder="https://facebook.com/yourname">
 
         <label>Order Type</label>
-        <select name="order_type" required>
-            <option value="">Select an option</option>
-            <option value="Stickers">Stickers</option>
-            <option value="Charm Bracelet">Charm Bracelet</option>
-            <option value="Photo Booth">Photo Booth</option>
-        </select>
 
         <label>Quantity</label>
-        <input type="number" name="quantity" min="1" required>
 
         <label>Amount Paid</label>
         <input type="number" name="amount" step="0.01" required>
@@ -74,6 +67,22 @@
 
         <button type="submit">Submit Order</button>
 
+        <h3>Order Items</h3>
+
+<div id="items-container">
+    <div class="order-item">
+        <select name="order_type[]" required>
+            <option value="">Select item</option>
+            <option value="Stickers">Stickers</option>
+            <option value="Charm Bracelet">Charm Bracelet</option>
+            <option value="Photo Booth">Photo Booth</option>
+        </select>
+
+        <input type="number" name="quantity[]" min="1" placeholder="Qty" required>
+    </div>
+</div>
+
+<button type="button" onclick="addItem()">+ Add Another Item</button>
     </form>
 
 {% elif page == "thanks" %}
