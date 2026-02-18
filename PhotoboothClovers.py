@@ -31,45 +31,48 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(
 client = gspread.authorize(creds)
 sheet = client.open_by_key(SPREADSHEET_ID).sheet1
 
-
 # ===============================
-# HELPERS
+# CACHE
 # ===============================
 
 CACHE = {"data": None, "time": 0}
 
+def clear_cache():
+    global CACHE
+    CACHE = {"data": None, "time": 0}
+
+# ===============================
+# VALIDATION
+# ===============================
 
 def valid_email(email):
     if not email:
         return True
-    return bool(
-        re.fullmatch(r"[A-Za-z0-9._%+-]+@(gmail\.com|up\.edu\.ph)", email)
-    )
-
+    return bool(re.fullmatch(r"[A-Za-z0-9._%+-]+@(gmail\.com|up\.edu\.ph)", email))
 
 def valid_facebook(link):
     if not link:
         return True
-    return bool(
-        re.fullmatch(r"https?://(www\.)?facebook\.com/.+", link, re.IGNORECASE)
-    )
-
+    return bool(re.fullmatch(r"https?://(www\.)?facebook\.com/.+", link, re.IGNORECASE))
 
 def valid_order_type(order_type):
     return order_type in ["Stickers", "Charm Bracelet", "Photo Booth"]
 
+# ===============================
+# DATA ACCESS
+# ===============================
 
 def get_records():
     global CACHE
 
     headers = [
         "ID", "Name", "Email", "Facebook", "Order Type", "Quantity",
-        "Amount Paid", "Status", "Printed", "Claimed", "Timestamp", "Hidden", "Liked Page"
+        "Amount Paid", "Status", "Printed", "Claimed",
+        "Timestamp", "Hidden", "Liked Page"
     ]
 
     now = time.time()
 
-    # 2-second cache
     if CACHE["data"] and now - CACHE["time"] < 2:
         return CACHE["data"]
 
@@ -85,18 +88,47 @@ def get_records():
     CACHE = {"data": records, "time": now}
     return records
 
+# ===============================
+# GROUP UPDATE HELPER
+# ===============================
+
+def update_group_rows(group_id, column_index, toggle=False, force_value=None):
+    """
+    column_index is 1-based (Google Sheets index)
+    toggle=True flips Yes/No or Pending/Done
+    force_value sets a fixed value
+    """
+    values = sheet.get_all_values()
+
+    for i in range(1, len(values)):
+        if str(values[i][0]) == str(group_id):
+            current = values[i][column_index - 1]
+
+            if toggle:
+                if current == "Yes":
+                    new_value = "No"
+                elif current == "No":
+                    new_value = "Yes"
+                elif current == "Pending":
+                    new_value = "Done"
+                else:
+                    new_value = "Pending"
+            else:
+                new_value = force_value
+
+            sheet.update_cell(i + 1, column_index, new_value)
+
+    clear_cache()
+
+# ===============================
+# SOCKET BROADCAST
+# ===============================
 
 def broadcast_queue():
     records = get_records()
-
     visible = [r for r in records if r.get("Hidden", "No") != "Yes"]
 
-    pending = [
-        r for r in visible
-        if r["Status"].lower() == "pending"
-    ]
-
-    # Sort by timestamp
+    pending = [r for r in visible if r["Status"].lower() == "pending"]
     pending.sort(key=lambda r: r["Timestamp"])
 
     for i, r in enumerate(pending, start=1):
@@ -107,11 +139,9 @@ def broadcast_queue():
         "pending": pending
     })
 
-
 @socketio.on("connect")
 def on_connect():
     broadcast_queue()
-
 
 # ===============================
 # ROUTES
@@ -121,23 +151,24 @@ def on_connect():
 def form():
     return render_template("index.html", page="form")
 
-
 @app.route("/submit", methods=["POST"])
 def submit():
     name = re.sub(r"[^a-zA-Z0-9\s]", "", request.form.get("name", "").strip())
-
     email = request.form.get("email", "").strip().lower()
     facebook = request.form.get("facebook", "").strip()
     order_types = request.form.getlist("order_type[]")
     quantities = request.form.getlist("quantity[]")
-    amount = float(request.form.get("amount", 0))
 
-    timestamp = request.form.get("timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        amount = float(request.form.get("amount", 0))
+    except ValueError:
+        flash("Invalid amount.", "error")
+        return redirect(url_for("form"))
 
     liked_page = "Yes" if request.form.get("liked_page") else "No"
 
     if liked_page == "No":
-        flash("You must like the Sneak Attack Facebook page first.", "error")
+        flash("You must like the Facebook page first.", "error")
         return redirect(url_for("form"))
 
     if not valid_email(email):
@@ -148,47 +179,45 @@ def submit():
         flash("Invalid Facebook link", "error")
         return redirect(url_for("form"))
 
+    if not order_types:
+        flash("Please add at least one item.", "error")
+        return redirect(url_for("form"))
+
     for ot in order_types:
         if not valid_order_type(ot):
             flash("Invalid order type", "error")
             return redirect(url_for("form"))
 
     group_id = int(datetime.now().timestamp() * 1000)
-
-    if not order_types or not quantities:
-        flash("Please add at least one item.", "error")
-        return redirect(url_for("form"))
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     for order_type, qty in zip(order_types, quantities):
+        try:
+            qty = int(qty)
+            if qty < 1:
+                raise ValueError
+        except ValueError:
+            flash("Invalid quantity.", "error")
+            return redirect(url_for("form"))
+
         sheet.append_row([
-            group_id,
-            name,
-            email,
-            facebook,
-            order_type,
-            int(qty),
-            amount,
-            "Pending",
-            "No",
-            "No",
-            timestamp,
-            "No",
-            liked_page
+            group_id, name, email, facebook,
+            order_type, qty, amount,
+            "Pending", "No", "No",
+            timestamp, "No", liked_page
         ])
 
+    clear_cache()
     broadcast_queue()
     return redirect(url_for("thanks", position=group_id))
-
 
 @app.route("/thanks/<int:position>")
 def thanks(position):
     return render_template("index.html", page="thanks", position=position)
 
-
 @app.route("/queue")
 def queue():
     return render_template("index.html", page="queue")
-
 
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
@@ -199,93 +228,61 @@ def admin():
         return render_template("index.html", page="login", error="Wrong password")
     return render_template("index.html", page="login")
 
-
 @app.route("/dashboard")
 def dashboard():
     if not session.get("is_admin"):
         return redirect(url_for("admin"))
 
-    clear_cache()  # ensure fresh read
+    clear_cache()
     records = get_records()
-
     visible = [r for r in records if r.get("Hidden", "No") != "Yes"]
 
-    return render_template(
-        "index.html",
-        page="admin",
-        records=visible
-    )
+    return render_template("index.html", page="admin", records=visible)
+
+# ===============================
+# ADMIN ACTIONS (GROUP SAFE)
+# ===============================
 
 @app.route("/toggle/<int:group_id>", methods=["POST"])
 def toggle_status(group_id):
-    values = sheet.get_all_values()
-    updates = []
-
-    for i in range(1, len(values)):
-        if str(values[i][0]) == str(group_id):
-            current_status = values[i][7]
-            new_status = "Done" if current_status == "Pending" else "Pending"
-            updates.append((i + 1, new_status))
-
-    for row_number, status in updates:
-        sheet.update_cell(row_number, 8, status)
-
-    clear_cache()  # 🔥 IMPORTANT
-    broadcast_queue()
-    return redirect(url_for("dashboard"))
-
-
-
-@app.route("/toggle_printed/<int:order_id>", methods=["POST"])
-def toggle_printed(order_id):
     if not session.get("is_admin"):
         return redirect(url_for("admin"))
 
-    for i, r in enumerate(get_records(), start=2):
-        if r["ID"] == order_id:
-            sheet.update_cell(i, 9, "No" if r["Printed"] == "Yes" else "Yes")
-            break
-    clear_cache()
+    update_group_rows(group_id, column_index=8, toggle=True)
     broadcast_queue()
     return redirect(url_for("dashboard"))
 
-
-@app.route("/toggle_claimed/<int:order_id>", methods=["POST"])
-def toggle_claimed(order_id):
+@app.route("/toggle_printed/<int:group_id>", methods=["POST"])
+def toggle_printed(group_id):
     if not session.get("is_admin"):
         return redirect(url_for("admin"))
 
-    for i, r in enumerate(get_records(), start=2):
-        if r["ID"] == order_id:
-            sheet.update_cell(i, 10, "No" if r["Claimed"] == "Yes" else "Yes")
-            break
-    clear_cache()
+    update_group_rows(group_id, column_index=9, toggle=True)
     broadcast_queue()
     return redirect(url_for("dashboard"))
 
-
-@app.route("/clear/<int:order_id>", methods=["POST"])
-def clear_order(order_id):
+@app.route("/toggle_claimed/<int:group_id>", methods=["POST"])
+def toggle_claimed(group_id):
     if not session.get("is_admin"):
         return redirect(url_for("admin"))
 
-    for i, r in enumerate(get_records(), start=2):
-        if r["ID"] == order_id:
-            sheet.update_cell(i, 12, "Yes")
-            break
-
+    update_group_rows(group_id, column_index=10, toggle=True)
     broadcast_queue()
     return redirect(url_for("dashboard"))
 
+@app.route("/clear/<int:group_id>", methods=["POST"])
+def clear_order(group_id):
+    if not session.get("is_admin"):
+        return redirect(url_for("admin"))
+
+    update_group_rows(group_id, column_index=12, force_value="Yes")
+    broadcast_queue()
+    return redirect(url_for("dashboard"))
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("admin"))
-
-def clear_cache():
-    global CACHE
-    CACHE = {"data": None, "time": 0}
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
