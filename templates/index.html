@@ -54,17 +54,6 @@
         <input type="text" name="facebook" placeholder="https://facebook.com/yourname">
 
 
-
-        <label>Amount Paid</label>
-        <input type="number" name="amount" step="0.01" required>
-
-        <label class="checkbox-container">
-          <input type="checkbox" name="liked_page" required>
-           I have liked the Sneak Attack Facebook page
-        </label>
-
-        <button type="submit">Submit Order</button>
-
         <h3>Order Items</h3>
 
 <div id="items-container">
@@ -81,6 +70,17 @@
 </div>
 
 <button type="button" onclick="addItem()">+ Add Another Item</button>
+
+        <label>Amount Paid</label>
+        <input type="number" name="amount" step="0.01" required>
+
+        <label class="checkbox-container">
+          <input type="checkbox" name="liked_page" required>
+           I have liked the Sneak Attack Facebook page
+        </label>
+
+        <button type="submit">Submit Order</button>
+
     </form>
 
 {% elif page == "thanks" %}
