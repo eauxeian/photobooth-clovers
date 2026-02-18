@@ -148,13 +148,16 @@ def submit():
         flash("Invalid Facebook link", "error")
         return redirect(url_for("form"))
 
-    if not valid_order_type(order_type):
-        flash("Invalid order type", "error")
-        return redirect(url_for("form"))
-
-    new_id = int(datetime.now().timestamp() * 1000)
+    for ot in order_types:
+        if not valid_order_type(ot):
+            flash("Invalid order type", "error")
+            return redirect(url_for("form"))
 
     group_id = int(datetime.now().timestamp() * 1000)
+
+    if not order_types or not quantities:
+        flash("Please add at least one item.", "error")
+        return redirect(url_for("form"))
 
     for order_type, qty in zip(order_types, quantities):
         sheet.append_row([
@@ -174,7 +177,7 @@ def submit():
         ])
 
     broadcast_queue()
-    return redirect(url_for("thanks", position=new_id))
+    return redirect(url_for("thanks", position=group_id))
 
 
 @app.route("/thanks/<int:position>")
